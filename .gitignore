@@ -137,3 +137,5 @@ dmypy.json
 *.code-workspace
 
 *.warden
+
+*/node_modules/

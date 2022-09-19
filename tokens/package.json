@@ -1,0 +1,14 @@
+{
+  "name": "tokens",
+  "version": "1.0.0",
+  "description": "address: 0xC319529E295db852dE0421ef7851AeE46a8900ad",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.3.2"
+  }
+}
