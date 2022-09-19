@@ -109,6 +109,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.env
 
 # Spyder project settings
 .spyderproject
@@ -134,3 +135,5 @@ dmypy.json
 .history/
 .DS_Store
 *.code-workspace
+
+*.warden
