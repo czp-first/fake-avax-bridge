@@ -1,0 +1,10 @@
+version: "2"
+
+services:
+  enclave:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python server.py
+    ports:
+      - 8000:8000
