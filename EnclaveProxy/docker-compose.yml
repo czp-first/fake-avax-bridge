@@ -7,4 +7,4 @@ services:
       dockerfile: EnclaveProxy/Dockerfile
     command: ./EnclaveProxy -e dev.env
     ports:
-      - 8000:80
+      - 50055:50055

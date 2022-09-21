@@ -8,6 +8,8 @@
 import json
 import os
 
+from loguru import logger
+
 from crypto.adapter import get_crypto_obj
 from settings import enclave_settings
 import wallet
@@ -34,7 +36,7 @@ def store_credential(share_version: int, threshold: int, wardens: list, onboard_
         encrypt_shares = [
             {
                 "identification": item.split(".")[0],
-                "share": get_crypto_obj(item.split(".")[0]).encrypt(wallet["shares"][index])
+                "share": get_crypto_obj(item.split(".")[0]).encrypt(wallet_info["shares"][index])
             }
             for index, item in enumerate(wardens_path)
         ]
