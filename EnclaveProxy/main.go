@@ -6,7 +6,7 @@ import (
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 
-	"EnclaveProxy/server"
+	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/server"
 )
 
 var (
@@ -14,7 +14,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&envFile, "e", "dev.env", "env file")
+	flag.StringVar(&envFile, "e", ".env", "env file")
 }
 
 func main() {

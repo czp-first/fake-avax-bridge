@@ -3,8 +3,8 @@ package proxy
 import (
 	"os"
 
-	socket_cli "EnclaveProxy/proxy/socket"
-	vsock_cli "EnclaveProxy/proxy/vsock"
+	socket_cli "github.com/czp-first/fake-avax-bridge/EnclaveProxy/proxy/socket"
+	vsock_cli "github.com/czp-first/fake-avax-bridge/EnclaveProxy/proxy/vsock"
 )
 
 func Req(in, out interface{}) {

@@ -1,0 +1,10 @@
+version: "2"
+
+services:
+  enclave-proxy:
+    build:
+      context: ../
+      dockerfile: EnclaveProxy/Dockerfile
+    command: ./EnclaveProxy -e dev.env
+    ports:
+      - 8000:80

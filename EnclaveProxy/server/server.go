@@ -14,10 +14,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	pb "EnclaveProxy/enclavepb"
-	"EnclaveProxy/proxy"
-	"EnclaveProxy/wardencli"
-	"EnclaveProxy/wardenpb"
+	pb "github.com/czp-first/fake-avax-bridge/EnclaveProxy/enclavepb"
+	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/proxy"
+	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/wardencli"
+
+	"github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 )
 
 type server struct {
@@ -404,7 +405,7 @@ func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) err
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("offboard txn hash: %v\n", txn.Hash().String())
+	log.Infof("offboard txn hash: %v", txn.Hash().String())
 
 	for _, addr := range wardenMap {
 		wardencli.Offboard(addr, &wardenpb.OffboardReq{
@@ -427,7 +428,7 @@ func NewServer() {
 	s := grpc.NewServer()
 
 	pb.RegisterEnclaveServer(s, &server{})
-	log.Infof("server listening at %v\n", lis.Addr())
+	log.Infof("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

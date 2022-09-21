@@ -24,6 +24,6 @@ func Req(in, out interface{}) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(string(b[:n]))
+	log.Info(string(b[:n]))
 
 }

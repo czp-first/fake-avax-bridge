@@ -130,10 +130,12 @@ dmypy.json
 .pyre/
 .idea/
 
+# mac
+.DS_Store
+
 # vscode
 .vscode/
 .history/
-.DS_Store
 *.code-workspace
 
 *.warden

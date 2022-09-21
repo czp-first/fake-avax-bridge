@@ -2,20 +2,20 @@ package wardencli
 
 import (
 	"context"
-	"log"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	pb "EnclaveProxy/wardenpb"
+	pb "github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 )
 
 func GetOnboardTxn(address string, in *pb.GetWardenOnboardReq) *pb.GetWardenOnboardResp {
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect :%v\n", err)
+		log.Fatalf("did not connect :%v", err)
 	}
-	log.Printf("connected %s\n", address)
+	log.Infof("connected %s", address)
 	defer conn.Close()
 
 	wardenClient := pb.NewWardenClient(conn)
@@ -33,9 +33,9 @@ func GetOnboardTxn(address string, in *pb.GetWardenOnboardReq) *pb.GetWardenOnbo
 func Onboard(address string, in *pb.OnboardReq) *pb.Empty {
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect :%v\n", err)
+		log.Fatalf("did not connect :%v", err)
 	}
-	log.Printf("connected %s\n", address)
+	log.Infof("connected %s", address)
 	defer conn.Close()
 
 	wardenClient := pb.NewWardenClient(conn)
@@ -53,9 +53,9 @@ func Onboard(address string, in *pb.OnboardReq) *pb.Empty {
 func GetOffboardTxn(address string, in *pb.GetWardenOffboardReq) *pb.GetWardenOffboardResp {
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect :%v\n", err)
+		log.Fatalf("did not connect :%v", err)
 	}
-	log.Printf("connected %s\n", address)
+	log.Infof("connected %s", address)
 	defer conn.Close()
 
 	wardenClient := pb.NewWardenClient(conn)
@@ -73,9 +73,9 @@ func GetOffboardTxn(address string, in *pb.GetWardenOffboardReq) *pb.GetWardenOf
 func Offboard(address string, in *pb.OffboardReq) *pb.Empty {
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect :%v\n", err)
+		log.Fatalf("did not connect :%v", err)
 	}
-	log.Printf("connected %s\n", address)
+	log.Infof("connected %s", address)
 	defer conn.Close()
 
 	wardenClient := pb.NewWardenClient(conn)
