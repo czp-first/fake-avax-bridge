@@ -1,6 +1,6 @@
 FROM python:3.8
 
-ENV PROJECT_DIR=bridge-settings-server
+ENV PROJECT_DIR=fake-cloud-service
 
 RUN mkdir /$PROJECT_DIR
 WORKDIR /$PROJECT_DIR

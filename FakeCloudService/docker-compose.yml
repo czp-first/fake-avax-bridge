@@ -1,7 +1,7 @@
 version: "2"
 
 services:
-  bridge-settings-api:
+  fake-cloud-service-api:
     build:
       context: .
       dockerfile: Dockerfile
