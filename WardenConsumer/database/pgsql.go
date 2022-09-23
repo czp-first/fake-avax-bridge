@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/database"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/lib/pq"
@@ -51,7 +52,7 @@ func (con *PgSQL) GetDB() *sql.DB {
 	return con.db
 }
 
-func (con *PgSQL) SelectEnclaveOnboard(blockHash, txnHash string, batch int64) (*EnclaveOnboard, error) {
+func (con *PgSQL) SelectEnclaveOnboard(blockHash, txnHash string, batch int64) (*database.EnclaveOnboard, error) {
 	var onboardTxnHash string
 	var nonce uint64
 
@@ -67,7 +68,7 @@ func (con *PgSQL) SelectEnclaveOnboard(blockHash, txnHash string, batch int64) (
 		log.Errorf("Fail select enclave_onboard: %v\n", err)
 		return nil, err
 	}
-	return &EnclaveOnboard{OnboardTxnHash: onboardTxnHash, Nonce: nonce}, nil
+	return &database.EnclaveOnboard{OnboardTxnHash: onboardTxnHash, Nonce: nonce}, nil
 }
 
 func (con *PgSQL) IsWardenOnboardExist(blockHash, txnHash string, batch int64) (bool, error) {
@@ -173,7 +174,7 @@ func (con *PgSQL) EnclaveOnboard(blockHash, txnHash, onboardTxnHash string, nonc
 
 // offboard
 
-func (con *PgSQL) SelectOffboard(blockHash, txnHash string, batch int64) (*EnclaveOffboard, error) {
+func (con *PgSQL) SelectOffboard(blockHash, txnHash string, batch int64) (*database.EnclaveOffboard, error) {
 	var offboardTxnHash string
 	var nonce uint64
 
@@ -190,7 +191,7 @@ func (con *PgSQL) SelectOffboard(blockHash, txnHash string, batch int64) (*Encla
 		log.Errorf("Fail select offboard: %v\n", err)
 		return nil, err
 	}
-	return &EnclaveOffboard{OffboardTxnHash: offboardTxnHash, Nonce: nonce}, nil
+	return &database.EnclaveOffboard{OffboardTxnHash: offboardTxnHash, Nonce: nonce}, nil
 }
 
 func (con *PgSQL) IsOffboardTxnExist(blockHash, txnHash string, batch int64) (bool, error) {
@@ -220,14 +221,14 @@ func (con *PgSQL) InsertCompleteOffboardTxn(blockHash, txnHash, contract, accoun
 		)
 	`)
 	if err != nil {
-		log.Errorf("Fail insert complete offboard_txn: %v\n", err)
+		log.Errorf("Fail insert complete offboard_txn: %v", err)
 		return err
 	}
 	defer stmt.Close()
 
 	_, err = stmt.Exec(blockHash, txnHash, chainId, contract, account, amount, blockNumber, txnIndex, "pending", offboardTxnHash, nonce, batch)
 	if err != nil {
-		log.Errorf("Fail insert complete offboard_txn: %v\n", err)
+		log.Errorf("Fail insert complete offboard_txn: %v", err)
 		return err
 	}
 	return nil
@@ -256,77 +257,77 @@ func (con *PgSQL) InsertOffboardTxn(blockHash, txnHash, contract, account string
 	return nil
 }
 
-func (con *PgSQL) SelectInitOffboardTxn() *OffboardTxn {
-	var rowId, chainId, blockNumber, amount, batch int64
-	var contract, account, status, blockHash, txnHash string
-	var txnIndex int
+// func (con *PgSQL) SelectInitOffboardTxn() *OffboardTxn {
+// 	var rowId, chainId, blockNumber, amount, batch int64
+// 	var contract, account, status, blockHash, txnHash string
+// 	var txnIndex int
 
-	row := con.db.QueryRow(
-		`
-		select id, chain_id, contract, account, amount, block_number, txn_index, status, block_hash, txn_hash, batch
-		from offboard_txn where status=$1 order by id limit 1
-	`, "init",
-	)
+// 	row := con.db.QueryRow(
+// 		`
+// 		select id, chain_id, contract, account, amount, block_number, txn_index, status, block_hash, txn_hash, batch
+// 		from offboard_txn where status=$1 order by id limit 1
+// 	`, "init",
+// 	)
 
-	err := row.Scan(
-		&rowId, &chainId, &contract, &account, &amount, &blockNumber, &txnIndex, &status,
-		&blockHash, &txnHash, &batch,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil
-		}
-		log.Errorf("Fail select init offboard txn: %v\n", err)
-		return nil
-	}
+// 	err := row.Scan(
+// 		&rowId, &chainId, &contract, &account, &amount, &blockNumber, &txnIndex, &status,
+// 		&blockHash, &txnHash, &batch,
+// 	)
+// 	if err != nil {
+// 		if err == sql.ErrNoRows {
+// 			return nil
+// 		}
+// 		log.Errorf("Fail select init offboard txn: %v\n", err)
+// 		return nil
+// 	}
 
-	offboardTxn := &OffboardTxn{
-		RowId:     rowId,
-		ChainId:   chainId,
-		Amount:    amount,
-		Contract:  contract,
-		Account:   account,
-		BlockHash: blockHash,
-		TxnHash:   txnHash,
-		Batch:     batch,
-	}
-	return offboardTxn
-}
+// 	offboardTxn := &OffboardTxn{
+// 		RowId:     rowId,
+// 		ChainId:   chainId,
+// 		Amount:    amount,
+// 		Contract:  contract,
+// 		Account:   account,
+// 		BlockHash: blockHash,
+// 		TxnHash:   txnHash,
+// 		Batch:     batch,
+// 	}
+// 	return offboardTxn
+// }
 
-func (con *PgSQL) SelectPendingOffboardTxn() (*OffboardTxn, error) {
+// func (con *PgSQL) SelectPendingOffboardTxn() (*OffboardTxn, error) {
 
-	var rowId, chainId, blockNumber, amount, nonce, batch int64
-	var contract, account, status, blockHash, txnHash, offboardTxnHash string
-	var txnIndex int
+// 	var rowId, chainId, blockNumber, amount, nonce, batch int64
+// 	var contract, account, status, blockHash, txnHash, offboardTxnHash string
+// 	var txnIndex int
 
-	row := con.db.QueryRow(`
-		select id, chain_id, contract, account, amount, block_number, txn_index, status, block_hash, txn_hash, nonce, offboard_txn_hash, batch from offboard_txn where status=$1 order by id limit 1
-	`, "pending")
-	err := row.Scan(&rowId, &chainId, &contract, &account, &amount, &blockNumber, &txnIndex, &status,
-		&blockHash, &txnHash, &nonce, &offboardTxnHash, &batch)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		log.Errorf("Fail select pending offboard_txn: %v\n", err)
-		return nil, err
-	}
-	return &OffboardTxn{
-		RowId:           rowId,
-		ChainId:         chainId,
-		BlockNumber:     blockNumber,
-		Amount:          amount,
-		Contract:        contract,
-		Account:         account,
-		BlockHash:       blockHash,
-		TxnHash:         txnHash,
-		Nonce:           nonce,
-		OffboardTxnHash: offboardTxnHash,
-		TxIndex:         txnIndex,
-		Batch:           batch,
-	}, nil
+// 	row := con.db.QueryRow(`
+// 		select id, chain_id, contract, account, amount, block_number, txn_index, status, block_hash, txn_hash, nonce, offboard_txn_hash, batch from offboard_txn where status=$1 order by id limit 1
+// 	`, "pending")
+// 	err := row.Scan(&rowId, &chainId, &contract, &account, &amount, &blockNumber, &txnIndex, &status,
+// 		&blockHash, &txnHash, &nonce, &offboardTxnHash, &batch)
+// 	if err != nil {
+// 		if err == sql.ErrNoRows {
+// 			return nil, nil
+// 		}
+// 		log.Errorf("Fail select pending offboard_txn: %v\n", err)
+// 		return nil, err
+// 	}
+// 	return &OffboardTxn{
+// 		RowId:           rowId,
+// 		ChainId:         chainId,
+// 		BlockNumber:     blockNumber,
+// 		Amount:          amount,
+// 		Contract:        contract,
+// 		Account:         account,
+// 		BlockHash:       blockHash,
+// 		TxnHash:         txnHash,
+// 		Nonce:           nonce,
+// 		OffboardTxnHash: offboardTxnHash,
+// 		TxIndex:         txnIndex,
+// 		Batch:           batch,
+// 	}, nil
 
-}
+// }
 
 func (con *PgSQL) SelectPendingOffboardTxnCount() (int, error) {
 	var count int
@@ -344,30 +345,30 @@ func (con *PgSQL) SelectPendingOffboardTxnCount() (int, error) {
 	return count, nil
 }
 
-func (con *PgSQL) SelectOffboardTxn(blockHash, txnHash string) *OffboardTxn {
-	var chainId, blockNumber, amount int64
-	var contract, account, status string
-	var txnIndex int
+// func (con *PgSQL) SelectOffboardTxn(blockHash, txnHash string) *OffboardTxn {
+// 	var chainId, blockNumber, amount int64
+// 	var contract, account, status string
+// 	var txnIndex int
 
-	row := con.db.QueryRow(
-		`
-		select chain_id, contract, account, amount, block_number, txn_index, status from offboard_txn where block_hash=$1 and txn_hash=$2
-	`, blockHash, txnHash,
-	)
+// 	row := con.db.QueryRow(
+// 		`
+// 		select chain_id, contract, account, amount, block_number, txn_index, status from offboard_txn where block_hash=$1 and txn_hash=$2
+// 	`, blockHash, txnHash,
+// 	)
 
-	err := row.Scan(&chainId, &contract, &account, &amount, &blockNumber, &txnIndex, &status)
-	if err != nil {
-		log.Errorf("Fail select offboard_txn :%v\n", err)
-	}
+// 	err := row.Scan(&chainId, &contract, &account, &amount, &blockNumber, &txnIndex, &status)
+// 	if err != nil {
+// 		log.Errorf("Fail select offboard_txn :%v\n", err)
+// 	}
 
-	offboardTxn := &OffboardTxn{
-		ChainId:  chainId,
-		Amount:   amount,
-		Contract: contract,
-		Account:  account,
-	}
-	return offboardTxn
-}
+// 	offboardTxn := &OffboardTxn{
+// 		ChainId:  chainId,
+// 		Amount:   amount,
+// 		Contract: contract,
+// 		Account:  account,
+// 	}
+// 	return offboardTxn
+// }
 
 func (con *PgSQL) UpdateInitOffboardTxn(rowId int64, status string, handlerTx *sql.Tx) error {
 	stmt, err := handlerTx.Prepare(`

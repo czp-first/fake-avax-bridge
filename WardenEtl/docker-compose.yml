@@ -1,0 +1,9 @@
+version: "2"
+
+services:
+  warden-etl:
+    build:
+      context: ../
+      dockerfile: WardenEtl/Dockerfile
+
+# docker run -it --env-file warden1.env  wardenetl_warden-etl bash

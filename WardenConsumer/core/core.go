@@ -1,9 +1,10 @@
 package core
 
 import (
-	"WardenConsumer/database"
-	"WardenConsumer/middleware"
-	"WardenConsumer/settings"
+	"github.com/czp-first/fake-avax-bridge/WardenConsumer/database"
+
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/settings"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	log "github.com/sirupsen/logrus"
@@ -28,7 +29,7 @@ func (ctx *ConsumerContext) initDb() {
 }
 
 func (ctx *ConsumerContext) initPulsarCli() {
-	ctx.pulsarCli = middleware.CreateClient()
+	ctx.pulsarCli = middleware.CreatePulsarClient()
 }
 
 func (ctx *ConsumerContext) initBridgeSettings() {
@@ -36,7 +37,7 @@ func (ctx *ConsumerContext) initBridgeSettings() {
 	if err != nil {
 		log.Fatalf("fail initialize bridge settings: %v", err)
 	}
-	bridgeSettings := bridgeSettingsFactory.MakeBridgeSettings()
+	bridgeSettings := bridgeSettingsFactory.MakeSettings()
 	ctx.bridgeSettings = bridgeSettings
 }
 

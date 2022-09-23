@@ -1,7 +1,7 @@
 package settings
 
 import (
-	"WardenEtl/middleware"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/bitly/go-simplejson"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ethereum/go-ethereum/common"
@@ -54,6 +57,12 @@ func (lbs *LocalBridgeSettings) InitSettings() {
 		log.Fatal(err)
 	}
 
+	settingsJson, err := simplejson.NewJson(body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	lbs.BridgeSettings.SettingsJson = settingsJson
+
 	var settings Settings
 
 	err = json.Unmarshal(body, &settings)
@@ -64,7 +73,7 @@ func (lbs *LocalBridgeSettings) InitSettings() {
 	lbs.BridgeSettings.Settings = settings
 }
 
-func (lbs *LocalBridgeSettings) Update(client pulsar.Client, isOnboard bool) {
+func (lbs *LocalBridgeSettings) ProduceUpdate(client pulsar.Client, isOnboard bool) {
 	jsonSchema := pulsar.NewJSONSchema(middleware.SettingsSchemaDef, nil)
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
 		Topic:  os.Getenv("PulsarSettingsTopic"),
@@ -86,4 +95,50 @@ func (lbs *LocalBridgeSettings) Update(client pulsar.Client, isOnboard bool) {
 		log.Fatal(err)
 	}
 	log.Infof("publish %s message", os.Getenv("PulsarSettingsTopic"))
+}
+
+func (lbs *LocalBridgeSettings) ConsumeUpdate(body *middleware.SettingsJSON) {
+
+	lbs.Get()
+
+	for _, field := range body.Fields {
+		switch field.Type {
+		case "int":
+			value := new(big.Int)
+			value, ok := value.SetString(field.Value, 10)
+			if !ok {
+				log.Fatal("fail convert string to bigint")
+			}
+			lbs.BridgeSettings.SettingsJson.SetPath(field.Path, value)
+		case "bool":
+			if field.Value == "false" {
+				lbs.BridgeSettings.SettingsJson.SetPath(field.Path, false)
+			} else {
+				lbs.BridgeSettings.SettingsJson.SetPath(field.Path, true)
+			}
+		case "string":
+			lbs.BridgeSettings.SettingsJson.SetPath(field.Path, field.Value)
+		}
+	}
+
+	bridgeSettingsClient := http.Client{
+		Timeout: time.Second * 2,
+	}
+
+	s_bytes, err := lbs.BridgeSettings.SettingsJson.MarshalJSON()
+	if err != nil {
+		log.Fatal(err)
+	}
+	request, err := http.NewRequest(http.MethodPut, os.Getenv("BridgeSettingsFileURL"), bytes.NewBuffer(s_bytes))
+	if err != nil {
+		log.Fatal(err)
+	}
+	response, err := bridgeSettingsClient.Do(request)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if response.Body != nil {
+		defer response.Body.Close()
+	}
 }

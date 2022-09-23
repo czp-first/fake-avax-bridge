@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -27,6 +28,10 @@ func (s *S3BridgeSettings) InitSettings() {
 
 }
 
-func (s *S3BridgeSettings) Update(client pulsar.Client, isOnboard bool) {
+func (s *S3BridgeSettings) ProduceUpdate(client pulsar.Client, isOnboard bool) {
+
+}
+
+func (s *S3BridgeSettings) ConsumeUpdate(body *middleware.SettingsJSON) {
 
 }

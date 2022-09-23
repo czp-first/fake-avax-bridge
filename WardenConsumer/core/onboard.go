@@ -7,7 +7,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	log "github.com/sirupsen/logrus"
 
-	"WardenConsumer/middleware"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
 )
 
 func (ctx *ConsumerContext) ConsumeOnboardTxn() {

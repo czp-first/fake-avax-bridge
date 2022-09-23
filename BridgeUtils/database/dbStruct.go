@@ -38,10 +38,10 @@ type WardenOffboard struct {
 
 type EnclaveOnboard struct {
 	OnboardTxnHash string
-	Nonce          int64
+	Nonce          uint64
 }
 
 type EnclaveOffboard struct {
 	OffboardTxnHash string
-	Nonce           int64
+	Nonce           uint64
 }

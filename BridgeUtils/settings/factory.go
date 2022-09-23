@@ -2,8 +2,13 @@ package settings
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 
+	"github.com/bitly/go-simplejson"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
+
+	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -14,12 +19,20 @@ type BridgeSettingsFactory interface {
 type BridgeSettingsInterface interface {
 	InitSettings()
 	Get() error
-	Update()
+
+	ProduceUpdate(client pulsar.Client, isOnboard bool)
+	ConsumeUpdate(body *middleware.SettingsJSON)
+
 	GetSettings() Settings
-	GetTokenAddrs(chainId uint64) []common.Address
-	GetOnboardAssetsConfig() AssetsConfig
+	GetTokenAddrs(chainId *big.Int) []common.Address
+	GetOnboardAssetsConfig() *AssetsConfig
 	IsUseEip1559TransactionFormat() bool
 	GetCurrentGasPrices() CurrentGasPrices
+
+	NewOnboardSettingsJSON()
+	AppendOnboardSettingsJSON(field *middleware.SettingsField)
+	NewOffboardSettingsJSON()
+	AppendOffboardSettingsJSON(field *middleware.SettingsField)
 }
 
 func GetBridgeSettingsFactory() (BridgeSettingsFactory, error) {
@@ -35,11 +48,30 @@ func GetBridgeSettingsFactory() (BridgeSettingsFactory, error) {
 }
 
 type BridgeSettings struct {
+	SettingsJson         *simplejson.Json
 	Settings             Settings
-	ChainToken2Name      map[uint64]map[common.Address]string
-	ChainToken2Addr      map[uint64]map[string]common.Address
+	ChainToken2Name      map[*big.Int]map[common.Address]string
+	ChainToken2Addr      map[*big.Int]map[string]common.Address
 	OnboardAssetsConfig  AssetsConfig
 	OffboardAssetsConfig AssetsConfig
+	OnboardSettingsJSON  *middleware.SettingsJSON
+	OffboardSettingsJSON *middleware.SettingsJSON
+}
+
+func (bs *BridgeSettings) NewOnboardSettingsJSON() {
+	bs.OnboardSettingsJSON = &middleware.SettingsJSON{Fields: make([]*middleware.SettingsField, 0)}
+}
+
+func (bs *BridgeSettings) AppendOnboardSettingsJSON(field *middleware.SettingsField) {
+	bs.OnboardSettingsJSON.Fields = append(bs.OnboardSettingsJSON.Fields, field)
+}
+
+func (bs *BridgeSettings) NewOffboardSettingsJSON() {
+	bs.OffboardSettingsJSON = &middleware.SettingsJSON{Fields: make([]*middleware.SettingsField, 0)}
+}
+
+func (bs *BridgeSettings) AppendOffboardSettingsJSON(field *middleware.SettingsField) {
+	bs.OffboardSettingsJSON.Fields = append(bs.OffboardSettingsJSON.Fields, field)
 }
 
 func (bs *BridgeSettings) Get() error {
@@ -121,7 +153,7 @@ func (bs *BridgeSettings) GetSettings() Settings {
 	return bs.Settings
 }
 
-func (bs *BridgeSettings) GetTokenAddrs(chainId uint64) []common.Address {
+func (bs *BridgeSettings) GetTokenAddrs(chainId *big.Int) []common.Address {
 	tokenMap := bs.ChainToken2Name[chainId]
 	tokensAddr := make([]common.Address, 0, len(tokenMap))
 	for tokenAddr := range tokenMap {
@@ -130,8 +162,8 @@ func (bs *BridgeSettings) GetTokenAddrs(chainId uint64) []common.Address {
 	return tokensAddr
 }
 
-func (bs *BridgeSettings) GetOnboardAssetsConfig() AssetsConfig {
-	return bs.OnboardAssetsConfig
+func (bs *BridgeSettings) GetOnboardAssetsConfig() *AssetsConfig {
+	return &bs.OnboardAssetsConfig
 }
 
 func (bs *BridgeSettings) IsUseEip1559TransactionFormat() bool {

@@ -4,7 +4,7 @@ import (
 	"flag"
 	"time"
 
-	"WardenConsumer/core"
+	"github.com/czp-first/fake-avax-bridge/WardenConsumer/core"
 
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"

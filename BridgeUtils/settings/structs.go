@@ -13,9 +13,10 @@ type Settings struct {
 }
 
 type Critical struct {
-	Assets        map[string]Asset
-	Networks      Networks
-	WalletAddress WalletAddress
+	Assets                      map[string]Asset
+	Networks                    Networks
+	WalletAddress               WalletAddress
+	UseEip1559TransactionFormat bool `json:"useEip1559TransactionFormat"`
 }
 
 type Asset struct {

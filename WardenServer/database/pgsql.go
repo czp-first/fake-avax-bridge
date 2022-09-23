@@ -6,26 +6,13 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/database"
 	_ "github.com/lib/pq"
 	log "github.com/sirupsen/logrus"
 )
 
 type PgSQL struct {
-	db *sql.DB
-}
-
-func NewPgSQL() (*PgSQL, error) {
-	dsn := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		os.Getenv("PgHost"), os.Getenv("PgPort"), os.Getenv("PgUser"), os.Getenv("PgPassword"), os.Getenv("PgDb"),
-	)
-
-	dbCon, err := initDB("postgres", dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PgSQL{db: dbCon}, nil
+	Db *sql.DB
 }
 
 func initDB(driverName, constr string) (*sql.DB, error) {
@@ -42,31 +29,45 @@ func initDB(driverName, constr string) (*sql.DB, error) {
 	return dbCon, nil
 }
 
+func NewPgSQL() (*PgSQL, error) {
+	psqlInfo := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("PgHost"), os.Getenv("PgPort"), os.Getenv("PgUser"), os.Getenv("PgPassword"), os.Getenv("PgDb"),
+	)
+
+	dbCon, err := initDB("postgres", psqlInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PgSQL{Db: dbCon}, nil
+}
+
 func (con *PgSQL) Close() error {
-	return con.db.Close()
+	return con.Db.Close()
 }
 
 func (con *PgSQL) GetDB() *sql.DB {
-	return con.db
+	return con.Db
 }
 
 // onboard
-func (con *PgSQL) SelectWardenOnboard(blockHash, txnHash string) *WardenOnboard {
+func (con *PgSQL) SelectWardenOnboard(blockHash, txnHash string) *database.WardenOnboard {
 	var amount, blockNumber, chainId int64
 	var contract, account, status string
 	var txnIndex int
 
-	row := con.db.QueryRow(
+	row := con.Db.QueryRow(
 		`select chain_id, contract, account, amount, block_number, txn_index, status from warden_onboard where block_hash=$1 and txn_hash=$2`,
 		blockHash, txnHash,
 	)
 
 	err := row.Scan(&chainId, &contract, &account, &amount, &blockNumber, &txnIndex, &status)
 	if err != nil {
-		log.Errorf("Fail select warden onboard: %v\n", err)
+		log.Errorf("Fail select warden onboard: %v", err)
 	}
 
-	onboardTxn := &WardenOnboard{
+	onboardTxn := &database.WardenOnboard{
 		ChainId:  big.NewInt(chainId),
 		Amount:   big.NewInt(amount),
 		Contract: contract,
@@ -75,14 +76,14 @@ func (con *PgSQL) SelectWardenOnboard(blockHash, txnHash string) *WardenOnboard 
 	return onboardTxn
 }
 
-func (con *PgSQL) RetrieveOldestPendingWardenOnboard() (*WardenOnboard, error) {
+func (con *PgSQL) RetrieveOldestPendingWardenOnboard() (*database.WardenOnboard, error) {
 
 	var blockNumber, nonce uint64
 	var amount, batch, chainId, rowId int64
 	var contract, account, status, blockHash, txnHash, onboardTxnHash string
 	var txnIndex uint
 
-	row := con.db.QueryRow(`select
+	row := con.Db.QueryRow(`select
 			id, chain_id, contract, account, amount, block_number, txn_index,
 			status, block_hash, txn_hash, nonce, onboard_txn_hash, batch
 		from
@@ -100,7 +101,7 @@ func (con *PgSQL) RetrieveOldestPendingWardenOnboard() (*WardenOnboard, error) {
 		log.Errorf("confirm onboard: Fail select oldest pending warden onboard: %v", err)
 		return nil, err
 	}
-	return &WardenOnboard{
+	return &database.WardenOnboard{
 		RowId:          rowId,
 		ChainId:        big.NewInt(chainId),
 		BlockNumber:    blockNumber,
@@ -133,13 +134,13 @@ func (con *PgSQL) UpdateWardenOnboardStatusById(rowId int64, status string, hand
 	return nil
 }
 
-func (con *PgSQL) RetrieveOldestInitWardenOnboard() (*WardenOnboard, error) {
+func (con *PgSQL) RetrieveOldestInitWardenOnboard() (*database.WardenOnboard, error) {
 	var blockNumber uint64
 	var amount, batch, chainId, rowId int64
 	var contract, account, status, blockHash, txnHash string
 	var txnIndex int
 
-	row := con.db.QueryRow(`select
+	row := con.Db.QueryRow(`select
 			id, chain_id, contract, account, amount, block_number,
 			txn_index, status, block_hash, txn_hash, batch
 		from
@@ -163,7 +164,7 @@ func (con *PgSQL) RetrieveOldestInitWardenOnboard() (*WardenOnboard, error) {
 		return nil, err
 	}
 
-	return &WardenOnboard{
+	return &database.WardenOnboard{
 		RowId:       rowId,
 		ChainId:     big.NewInt(chainId),
 		Amount:      big.NewInt(amount),
@@ -192,12 +193,12 @@ func (con *PgSQL) DoneWardenOnboardByOnboardTxnHash(onboardTxnHash string, handl
 }
 
 // offboard
-func (con *PgSQL) SelectWardenOffboard(blockHash, txnHash string) *WardenOffboard {
+func (con *PgSQL) SelectWardenOffboard(blockHash, txnHash string) *database.WardenOffboard {
 	var amount, blockNumber, chainId int64
 	var contract, account, status string
 	var txnIndex int
 
-	row := con.db.QueryRow(`
+	row := con.Db.QueryRow(`
 		select chain_id, contract, account, amount, block_number, txn_index, status
 		from warden_offboard
 		where block_hash=$1 and txn_hash=$2
@@ -209,7 +210,7 @@ func (con *PgSQL) SelectWardenOffboard(blockHash, txnHash string) *WardenOffboar
 		log.Fatalf("Fail select warden offboard : %v\n", err)
 	}
 
-	offboardTxn := &WardenOffboard{
+	offboardTxn := &database.WardenOffboard{
 		ChainId:  big.NewInt(chainId),
 		Amount:   big.NewInt(amount),
 		Contract: contract,

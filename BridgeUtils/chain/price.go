@@ -1,10 +1,9 @@
-package utils
+package chain
 
 import (
 	"math/big"
 
 	"github.com/shopspring/decimal"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,7 +22,7 @@ func GetOffboardFeeToken(etherPrice, tokenPrice, gasPrice *big.Int, offboardFeeD
 		decimal.NewFromBigInt(etherPrice, -8),
 	)
 
-	log.Infof("Offboard gasfee[%v]\n", gasFee)
+	log.Infof("Offboard gasfee[%v]", gasFee)
 	totalFee := decimal.NewFromInt(offboardFeeDollars).Add(gasFee)
 
 	feeToken := totalFee.Div(
@@ -33,4 +32,28 @@ func GetOffboardFeeToken(etherPrice, tokenPrice, gasPrice *big.Int, offboardFeeD
 	)
 
 	return feeToken.BigInt()
+}
+
+func ToWei(iamount interface{}, decimals int) *big.Int {
+	amount := decimal.NewFromFloat(0)
+	switch v := iamount.(type) {
+	case string:
+		amount, _ = decimal.NewFromString(v)
+	case float64:
+		amount = decimal.NewFromFloat(v)
+	case int64:
+		amount = decimal.NewFromFloat(float64(v))
+	case decimal.Decimal:
+		amount = v
+	case *decimal.Decimal:
+		amount = *v
+	}
+
+	mul := decimal.NewFromFloat(float64(10)).Pow(decimal.NewFromFloat(float64(decimals)))
+	result := amount.Mul(mul)
+
+	wei := new(big.Int)
+	wei.SetString(result.String(), 10)
+
+	return wei
 }

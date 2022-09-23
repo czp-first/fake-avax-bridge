@@ -15,10 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/czp-first/fake-avax-bridge/WardenServer/chainlinkfeed"
-	"github.com/czp-first/fake-avax-bridge/WardenServer/contracts"
-	"github.com/czp-first/fake-avax-bridge/WardenServer/settings"
-	"github.com/czp-first/fake-avax-bridge/WardenServer/utils"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chain"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chainlinkfeed"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/contracts"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/settings"
 	pb "github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 )
 
@@ -132,7 +132,7 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 	chainlinkFeedAddress := asset.ChainlinkFeedAddress
 	// currentTokenPrice := big.NewInt(0)
 	var currentTokenPrice *big.Int
-	if chainlinkFeedAddress == common.HexToAddress("0x0000000000000000000000000000000000000000") {
+	if chainlinkFeedAddress == chain.ZeroAddress {
 		currentTokenPrice = s.bridgeSettings.GetSettings().NonCritical.CurrentEthPrice
 	} else {
 		currentTokenPrice, _ = chainlinkfeed.GetFeedData(chainlinkFeedAddress)
@@ -140,7 +140,7 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 	log.Infof("currentTokenPrice:%v", currentTokenPrice)
 
 	onboardFeeDollars := asset.OnboardFeeDollars
-	feeToken := utils.GetOnboardFeeToken(currentTokenPrice, onboardFeeDollars)
+	feeToken := chain.GetOnboardFeeToken(currentTokenPrice, onboardFeeDollars)
 
 	realAmount := big.NewInt(0)
 	realAmount.Sub(wardenOnboard.Amount, feeToken)
@@ -159,7 +159,7 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 
 	currentGasPrices := s.bridgeSettings.GetCurrentGasPrices()
 	suggestedTip := currentGasPrices.Dxchain.SuggestedTip
-	gasPrice := utils.ToWei(suggestedTip, 0)
+	gasPrice := chain.ToWei(suggestedTip, 0)
 
 	walletAddress := s.bridgeSettings.GetSettings().Critical.WalletAddress.Dxchain
 
@@ -179,7 +179,7 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 
 	// TODO: rpc problem when nonce equals 0
 	return &pb.GetWardenOnboardResp{
-		ChainId:    s.bridgeSettings.GetSettings().Critical.Networks.Dxchain,
+		ChainId:    s.bridgeSettings.GetSettings().Critical.Networks.Dxchain.Uint64(),
 		RealAmount: realAmount.Uint64(),
 		Account:    wardenOnboard.Account,
 		GasPrice:   gasPrice.Uint64(),
@@ -249,6 +249,7 @@ func (s *WardenContext) GetWardenOffboard(ctx context.Context, in *pb.GetWardenO
 	}
 	log.Infof("currentTokenPrice:%v\n", currentTokenPrice)
 
+	// TODO
 	client, err := ethclient.Dial(os.Getenv("ETHHttps"))
 	if err != nil {
 		log.Fatalf("Oops! There was a problem %s", err)
@@ -258,8 +259,8 @@ func (s *WardenContext) GetWardenOffboard(ctx context.Context, in *pb.GetWardenO
 
 	gasPrice := big.NewInt(0)
 	gasPrice.Add(
-		utils.ToWei(bridgeSettings.NonCritical.CurrentGasPrices.Ethereum.NextBaseFee, 0),
-		utils.ToWei(bridgeSettings.NonCritical.CurrentGasPrices.Ethereum.SuggestedTip, 0),
+		chain.ToWei(bridgeSettings.NonCritical.CurrentGasPrices.Ethereum.NextBaseFee, 0),
+		chain.ToWei(bridgeSettings.NonCritical.CurrentGasPrices.Ethereum.SuggestedTip, 0),
 	)
 
 	erc20TokenAbi, _ := abi.JSON(strings.NewReader(contracts.Erc20ABI))
@@ -277,7 +278,7 @@ func (s *WardenContext) GetWardenOffboard(ctx context.Context, in *pb.GetWardenO
 	}
 	estimateGas, _ := client.EstimateGas(context.TODO(), futureMsg)
 
-	feeToken := utils.GetOffboardFeeToken(etherPrice, currentTokenPrice, gasPrice, asset.OffboardFeeDollars, estimateGas)
+	feeToken := chain.GetOffboardFeeToken(etherPrice, currentTokenPrice, gasPrice, asset.OffboardFeeDollars, estimateGas)
 	realAmount := big.NewInt(0)
 	realAmount.Sub(wardenOffboard.Amount, feeToken)
 
@@ -296,7 +297,7 @@ func (s *WardenContext) GetWardenOffboard(ctx context.Context, in *pb.GetWardenO
 
 	// TODO: rpc problem when nonce equals 0
 	return &pb.GetWardenOffboardResp{
-		ChainId:    bridgeSettings.Critical.Networks.Ethereum,
+		ChainId:    bridgeSettings.Critical.Networks.Ethereum.Uint64(),
 		RealAmount: realAmount.Uint64(),
 		Account:    wardenOffboard.Account,
 		GasPrice:   gasPrice.Uint64(),

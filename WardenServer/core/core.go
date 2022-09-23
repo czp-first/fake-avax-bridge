@@ -5,12 +5,11 @@ import (
 	"net"
 	"os"
 
-	"github.com/czp-first/fake-avax-bridge/WardenServer/chains"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chain"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/settings"
 	"github.com/czp-first/fake-avax-bridge/WardenServer/credential"
 	"github.com/czp-first/fake-avax-bridge/WardenServer/database"
-
 	"github.com/czp-first/fake-avax-bridge/WardenServer/enclavecli"
-	"github.com/czp-first/fake-avax-bridge/WardenServer/settings"
 	pb "github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -20,13 +19,13 @@ import (
 
 type WardenContext struct {
 	pb.UnimplementedWardenServer
-	db             *database.PgSQL
-	bridgeSettings settings.BridgeSettingsInterface
-	EthClient      *chains.EthClient
-	DxClient       *chains.DxClient
-	pulsarCli      pulsar.Client
-	Enclave        enclavecli.EnclaveAPI
-	credential     credential.CredentialInterface
+	db              *database.PgSQL
+	bridgeSettings  settings.BridgeSettingsInterface
+	FromChainClient *chain.ChainClient
+	ToChainClient   *chain.ChainClient
+	pulsarCli       pulsar.Client
+	Enclave         enclavecli.EnclaveAPI
+	credential      credential.CredentialInterface
 }
 
 func NewWardenContext() (*WardenContext, error) {
@@ -44,13 +43,13 @@ func (ctx *WardenContext) Init() {
 	ctx.initBridgeSettings()
 	log.Infoln("Successfully initialize bridgeSettings")
 
-	log.Infoln("Connecting eth client...")
-	ctx.initEthClient()
-	log.Infoln("Successfully connect eth client")
+	log.Infoln("Connecting from chain client...")
+	ctx.initFromChainClient()
+	log.Infoln("Successfully connect from chain client")
 
-	log.Infoln("Connecting dx client...")
-	ctx.initDxClient()
-	log.Infoln("Successfully connect dx client")
+	log.Infoln("Connecting to chain client...")
+	ctx.initToChainClient()
+	log.Infoln("Successfully connect to chain client")
 
 	log.Infoln("Instancing pulsar client...")
 	ctx.initPulsarCli()
@@ -74,19 +73,19 @@ func (ctx *WardenContext) initDb() {
 	}
 }
 
-func (ctx *WardenContext) initEthClient() {
+func (ctx *WardenContext) initFromChainClient() {
 	var err error
-	ctx.EthClient, err = chains.NewEthClient()
+	ctx.FromChainClient, err = chain.NewChainClient(os.Getenv("FromChainHttps"), os.Getenv("FromChainWss"))
 	if err != nil {
-		log.Fatalf("Fail connect eth client: %v\n", err)
+		log.Fatalf("Fail connect from chain client: %v", err)
 	}
 }
 
-func (ctx *WardenContext) initDxClient() {
+func (ctx *WardenContext) initToChainClient() {
 	var err error
-	ctx.DxClient, err = chains.NewDxClient()
+	ctx.ToChainClient, err = chain.NewChainClient(os.Getenv("ToChainHttps"), os.Getenv("ToChainWss"))
 	if err != nil {
-		log.Fatalf("Fail connect dx client : %v\n", err)
+		log.Fatalf("Fail connect to chain client : %v", err)
 	}
 }
 

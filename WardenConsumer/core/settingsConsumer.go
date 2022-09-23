@@ -7,7 +7,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	log "github.com/sirupsen/logrus"
 
-	"WardenConsumer/middleware"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
 )
 
 func (ctx *ConsumerContext) ConsumeSettings() {
@@ -38,7 +38,7 @@ func (ctx *ConsumerContext) ConsumeSettings() {
 		}
 		log.Infof("Received message msgId: %#v -- content: '%s'", msg.ID(), string(msg.Payload()))
 
-		ctx.bridgeSettings.Update(&settings)
+		ctx.bridgeSettings.ConsumeUpdate(&settings)
 		consumer.Ack(msg)
 	}
 }

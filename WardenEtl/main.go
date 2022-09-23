@@ -7,7 +7,7 @@ import (
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 
-	"WardenEtl/core"
+	"github.com/czp-first/fake-avax-bridge/WardenEtl/core"
 )
 
 var (
@@ -15,21 +15,22 @@ var (
 )
 
 func init() {
-	flag.StringVar(&envFile, "e", "dev.env", "env file")
+	flag.StringVar(&envFile, "e", "", "env file")
 }
 
 func main() {
 
 	flag.Parse()
 
-	log.Info("Initializing env...")
-
-	err := godotenv.Load(envFile)
-	if err != nil {
-		log.Fatalf("Fail initialize env: %v\n", err)
-		return
+	if envFile != "" {
+		log.Infof("Initializing env..., envfile[%s]", envFile)
+		err := godotenv.Load(envFile)
+		if err != nil {
+			log.Fatalf("Fail initialize env: %v", err)
+			return
+		}
+		log.Info("Successfully initialize env")
 	}
-	log.Info("Successfully initialize env")
 
 	ctx, err := core.NewWardenContext()
 	if err != nil {

@@ -1,15 +1,18 @@
 package chainlinkfeed
 
 import (
-	"WardenEtl/contracts"
 	"math/big"
 	"os"
+
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
 )
 
+// https://avawarden-prod.s3.amazonaws.com/bridge_settings.json
+// aave: 0x6df09e975c830ecae5bd4ed9d90f3a95a4f88012
 func GetFeedData(contractAddr common.Address) (*big.Int, error) {
 
 	client, err := ethclient.Dial(os.Getenv("MainnetETHHttps"))

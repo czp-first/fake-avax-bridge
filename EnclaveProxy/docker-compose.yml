@@ -5,6 +5,8 @@ services:
     build:
       context: ../
       dockerfile: EnclaveProxy/Dockerfile
-    command: ./EnclaveProxy -e dev.env
-    ports:
-      - 50055:50055
+    # command: ./EnclaveProxy -e dev.env
+    # ports:
+    #   - 50055:50055
+
+# docker run -it --env-file dev.env  enclaveproxy_enclave-proxy bash

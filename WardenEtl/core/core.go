@@ -1,19 +1,24 @@
 package core
 
 import (
-	"WardenEtl/chains"
-	"WardenEtl/middleware"
-	"WardenEtl/settings"
+	"os"
+
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chain"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/settings"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	log "github.com/sirupsen/logrus"
 )
 
+/*
+for example: if onboard's direction is from ethereum to heco, heco is to chain, ethereum is from chain
+*/
 type WardenContext struct {
-	pulsarCli      pulsar.Client
-	bridgeSettings settings.BridgeSettingsInterface
-	EthClient      *chains.EthClient
-	DxClient       *chains.DxClient
+	pulsarCli       pulsar.Client
+	bridgeSettings  settings.BridgeSettingsInterface
+	FromChainClient *chain.ChainClient
+	ToChainClient   *chain.ChainClient
 }
 
 func NewWardenContext() (*WardenContext, error) {
@@ -25,21 +30,21 @@ func (ctx *WardenContext) initPulsarCli() {
 	ctx.pulsarCli = middleware.CreatePulsarClient()
 }
 
-// connect eth chain
-func (ctx *WardenContext) initEthClient() {
+// connect from chain
+func (ctx *WardenContext) initFromChainClient() {
 	var err error
-	ctx.EthClient, err = chains.NewEthClient()
+	ctx.FromChainClient, err = chain.NewChainClient(os.Getenv("FromChainHttps"), os.Getenv("FromChainWss"))
 	if err != nil {
-		log.Fatalf("Fail connect eth client: %v\n", err)
+		log.Fatalf("Fail connect from chain client: %v", err)
 	}
 }
 
-// connect dx chain
-func (ctx *WardenContext) initDxClient() {
+// connect to chain
+func (ctx *WardenContext) initToChainClient() {
 	var err error
-	ctx.DxClient, err = chains.NewDxClient()
+	ctx.ToChainClient, err = chain.NewChainClient(os.Getenv("ToChainHttps"), os.Getenv("ToChainWss"))
 	if err != nil {
-		log.Fatalf("Fail connect dx client : %v\n", err)
+		log.Fatalf("Fail connect to chain client : %v", err)
 	}
 }
 
@@ -47,7 +52,7 @@ func (ctx *WardenContext) initDxClient() {
 func (ctx *WardenContext) initBridgeSettings() {
 	bridgeSettingsFactory, err := settings.GetBridgeSettingsFactory()
 	if err != nil {
-		log.Fatalf("Fail initialize bridge settings: %v\n", err)
+		log.Fatalf("Fail initialize bridge settings: %v", err)
 	}
 	bridgeSettings := bridgeSettingsFactory.MakeSettings()
 
@@ -60,13 +65,13 @@ func (ctx *WardenContext) Init() {
 	ctx.initBridgeSettings()
 	log.Infoln("Successfully initialize bridgeSettings")
 
-	log.Infoln("Connecting eth client...")
-	ctx.initEthClient()
-	log.Infoln("Successfully connect eth client")
+	log.Infoln("Connecting from chain client...")
+	ctx.initFromChainClient()
+	log.Infoln("Successfully connect from chain client")
 
-	log.Infoln("Connecting dx client...")
-	ctx.initDxClient()
-	log.Infoln("Successfully connect dx client")
+	log.Infoln("Connecting to chain client...")
+	ctx.initToChainClient()
+	log.Infoln("Successfully connect to chain client")
 
 	log.Infoln("Instancing pulsar client...")
 	ctx.initPulsarCli()

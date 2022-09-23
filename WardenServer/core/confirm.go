@@ -3,7 +3,7 @@ package core
 import (
 	"time"
 
-	"github.com/czp-first/fake-avax-bridge/WardenServer/database"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/database"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -16,9 +16,9 @@ func (ctx *WardenContext) confirmOnboard(wardenOnboard *database.WardenOnboard) 
 		return nil
 	}
 
-	isOk, err := ctx.DxClient.ConfirmTxn(wardenOnboard.OnboardTxnHash)
+	isOk, err := ctx.ToChainClient.ConfirmTxn(wardenOnboard.OnboardTxnHash)
 	if err != nil {
-		log.Errorf("confirm onboard: dx client onboard err: %v", err)
+		log.Errorf("confirm onboard: to chain client onboard err: %v", err)
 		return err
 	}
 

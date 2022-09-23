@@ -14,19 +14,21 @@ var (
 )
 
 func init() {
-	flag.StringVar(&envFile, "e", ".env", "env file")
+	flag.StringVar(&envFile, "e", "", "env file")
 }
 
 func main() {
 
 	flag.Parse()
-	log.Info("Initializing env...")
-	err := godotenv.Load(envFile)
-	if err != nil {
-		log.Fatalf("Fail initialize env: %v", err)
-		return
+	if envFile != "" {
+		log.Info("Initializing env...")
+		err := godotenv.Load(envFile)
+		if err != nil {
+			log.Fatalf("Fail initialize env: %v", err)
+			return
+		}
+		log.Info("Successfully initialize env")
 	}
-	log.Info("Successfully initialize env")
 
 	server.NewServer()
 

@@ -1,12 +1,11 @@
 package core
 
 import (
-	"WardenEtl/chainlinkfeed"
-	"WardenEtl/consts"
-	"WardenEtl/contracts"
-	"WardenEtl/layer1"
-	"WardenEtl/middleware"
-	"WardenEtl/utils"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chain"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chainlinkfeed"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/contracts"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
+	"github.com/czp-first/fake-avax-bridge/WardenEtl/layer1"
 
 	"context"
 	"math/big"
@@ -20,16 +19,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (ctx *WardenContext) seeEthTransfer(query ethereum.FilterQuery) error {
-	logs, err := ctx.EthClient.WssClient.FilterLogs(context.Background(), query)
+func (ctx *WardenContext) seeFromChainTransfer(query ethereum.FilterQuery) error {
+	logs, err := ctx.FromChainClient.WssClient.FilterLogs(context.Background(), query)
 	if err != nil {
-		log.Errorf("onboard: Fail filter eth log: %v", err)
+		log.Errorf("onboard: Fail filter from chain log: %v", err)
 		return err
 	}
 
 	for _, vlog := range logs {
 		log.Infof("onboard: transfer token[%v] in block[%d] transaction[%v]", vlog.Address, vlog.BlockNumber, vlog.TxHash)
-		erc20Contract, err := layer1.NewBoundContract(ctx.EthClient.WssClient, vlog.Address, contracts.Erc20ABI)
+		erc20Contract, err := layer1.NewBoundContract(ctx.FromChainClient.WssClient, vlog.Address, contracts.Erc20ABI)
 		if err != nil {
 			log.Errorf("onboard: fail bound contract: %v", err)
 			return err
@@ -51,7 +50,7 @@ func (ctx *WardenContext) seeEthTransfer(query ethereum.FilterQuery) error {
 		}
 
 		currentTokenPrice := onboardAssetsConfig.CurrentEthPrice
-		if asset.ChainlinkFeedAddress != consts.ZeroAddress {
+		if asset.ChainlinkFeedAddress != chain.ZeroAddress {
 			currentTokenPrice, err = chainlinkfeed.GetFeedData(asset.ChainlinkFeedAddress)
 			if err != nil {
 				log.Errorf("onboard: fail get token[%v] price: %v", vlog.Address, err)
@@ -60,7 +59,7 @@ func (ctx *WardenContext) seeEthTransfer(query ethereum.FilterQuery) error {
 		}
 		log.Infof("onboard: currentToken[%v], currentTokenPrice[%v]", onboardAssetsConfig.Assets[vlog.Address].Name, currentTokenPrice)
 
-		feeAmount := utils.GetOnboardFeeToken(currentTokenPrice, asset.FeeDollars)
+		feeAmount := chain.GetOnboardFeeToken(currentTokenPrice, asset.FeeDollars)
 		log.Infof("onboard: fee amount %d", feeAmount)
 		if decimal.NewFromBigInt(transferEvent.Value, 0).Cmp(decimal.NewFromBigInt(feeAmount, 0)) <= 0 {
 			log.Warnf("onboard: Insufficient Amount, feeAmount[%d]>amount[%d], pass", feeAmount, transferEvent.Value)
@@ -102,7 +101,7 @@ func (ctx *WardenContext) seeEthTransfer(query ethereum.FilterQuery) error {
 	return nil
 }
 
-func (ctx *WardenContext) seeEthBlock() error {
+func (ctx *WardenContext) seeFromChainBlock() error {
 
 	log.Info("onboard: get settings")
 	ctx.bridgeSettings.InitSettings()
@@ -110,61 +109,61 @@ func (ctx *WardenContext) seeEthBlock() error {
 	ctx.bridgeSettings.NewOnboardSettingsJSON()
 
 	preSettings := ctx.bridgeSettings.GetSettings()
-	ethMinConfirmations := preSettings.NonCritical.MinimumConfirmations.Ethereum
-	preEthLastIndexedBlk := preSettings.NonCritical.NetworkViews.Ethereum.LastIndexedBlock
-	preEthLastSeenBlk := preSettings.NonCritical.NetworkViews.Ethereum.LastSeenBlock
+	fromChainMinConfirmations := preSettings.NonCritical.MinimumConfirmations.Ethereum
+	preFromChainLastIndexedBlk := preSettings.NonCritical.NetworkViews.Ethereum.LastIndexedBlock
+	preFromChainLastSeenBlk := preSettings.NonCritical.NetworkViews.Ethereum.LastSeenBlock
 	chainlinkEthUsdFeedAddress := preSettings.NonCritical.ChainlinkEthUsdFeedAddress
 
-	ethLatestBlockNum, err := ctx.EthClient.HttpClient.BlockNumber(context.Background())
+	fromChainLatestBlockNum, err := ctx.FromChainClient.HttpClient.BlockNumber(context.Background())
 	if err != nil {
 		log.Errorf("onboard: Get eth blockNumber err: %v", err)
 		return err
 	}
 	log.Infof(
-		"onboard: ethMinConfirmations[%d], preEthLastIndexedBlock[%d], preEthLastSeenBlock[%d], ethLatestBlock[%d]",
-		ethMinConfirmations, preEthLastIndexedBlk, preEthLastSeenBlk, ethLatestBlockNum,
+		"onboard: fromChainMinConfirmations[%d], preFromChainLastIndexedBlock[%d], preFromChainLastSeenBlock[%d], fromChainLatestBlock[%d]",
+		fromChainMinConfirmations, preFromChainLastIndexedBlk, preFromChainLastSeenBlk, fromChainLatestBlockNum,
 	)
 
-	currentEthPrice, err := chainlinkfeed.GetFeedData(chainlinkEthUsdFeedAddress)
+	currentFromChainPrice, err := chainlinkfeed.GetFeedData(chainlinkEthUsdFeedAddress)
 	if err != nil {
-		log.Errorf("onboard: get current eth price err: %v", err)
+		log.Errorf("onboard: get current from chain native price err: %v", err)
 		return err
 	}
-	log.Infof("onboard: Current eth price: %v", currentEthPrice)
+	log.Infof("onboard: current from chain native price: %v", currentFromChainPrice)
 	onboardAssetsConfig := ctx.bridgeSettings.GetOnboardAssetsConfig()
-	onboardAssetsConfig.CurrentEthPrice = currentEthPrice
+	onboardAssetsConfig.CurrentEthPrice = currentFromChainPrice
 	ctx.bridgeSettings.AppendOnboardSettingsJSON(&middleware.SettingsField{
 		Path:  []string{"nonCritical", "currentEthPrice"},
-		Value: currentEthPrice.String(),
+		Value: currentFromChainPrice.String(),
 		Type:  "int",
 	})
 
-	preEthLastIndexedBlk = 12714289 - 1 // weth
-	// preEthLastIndexedBlk = 12731462 - 1 // dx
-	if (ethLatestBlockNum - preEthLastIndexedBlk) > ethMinConfirmations {
-		readyEthIndexBlk := preEthLastIndexedBlk + 1
-		log.Infof("onboard: Ready index eth block[%d]", readyEthIndexBlk)
+	preFromChainLastIndexedBlk = 12714289 - 1 // weth
+	// preFromChainLastIndexedBlk = 12731462 - 1 // dx
+	if (fromChainLatestBlockNum - preFromChainLastIndexedBlk) > fromChainMinConfirmations {
+		readyFromChainIndexBlk := preFromChainLastIndexedBlk + 1
+		log.Infof("onboard: Ready index from chain block[%d]", readyFromChainIndexBlk)
 
 		tokensAddr := ctx.bridgeSettings.GetTokenAddrs(preSettings.Critical.Networks.Ethereum)
 		receiveAddressHash := preSettings.Critical.WalletAddress.Ethereum
 		addTopic := [][]common.Hash{{}, {receiveAddressHash.Hash()}}
-		query, err := layer1.MakeFilterQuery(tokensAddr, contracts.Erc20ABI, "Transfer", big.NewInt(int64(readyEthIndexBlk)), big.NewInt(int64(readyEthIndexBlk)), addTopic)
+		query, err := layer1.MakeFilterQuery(tokensAddr, contracts.Erc20ABI, "Transfer", big.NewInt(int64(readyFromChainIndexBlk)), big.NewInt(int64(readyFromChainIndexBlk)), addTopic)
 		if err != nil {
 			log.Errorf("onboard: make filter query err: %v", err)
 			return err
 		}
 
-		err = ctx.seeEthTransfer(query)
+		err = ctx.seeFromChainTransfer(query)
 		if err != nil {
-			log.Errorf("onboard: see eth transfer err: %v", err)
+			log.Errorf("onboard: see from chain transfer err: %v", err)
 			return err
 		}
-		ctx.bridgeSettings.AppendOnboardSettingsJSON(&middleware.SettingsField{Path: []string{"nonCritical", "networkViews", "ethereum", "lastIndexedBlock"}, Value: big.NewInt(int64(readyEthIndexBlk)).String(), Type: "int"})
-		log.Infof("onboard: Finish index eth block[%d]", readyEthIndexBlk)
+		ctx.bridgeSettings.AppendOnboardSettingsJSON(&middleware.SettingsField{Path: []string{"nonCritical", "networkViews", "ethereum", "lastIndexedBlock"}, Value: big.NewInt(int64(readyFromChainIndexBlk)).String(), Type: "int"})
+		log.Infof("onboard: Finish index from chain block[%d]", readyFromChainIndexBlk)
 	}
 
-	ctx.bridgeSettings.AppendOnboardSettingsJSON(&middleware.SettingsField{Path: []string{"nonCritical", "networkViews", "ethereum", "lastSeenBlock"}, Value: big.NewInt(int64(ethLatestBlockNum)).String(), Type: "int"})
-	ctx.bridgeSettings.Update(ctx.pulsarCli, true)
+	ctx.bridgeSettings.AppendOnboardSettingsJSON(&middleware.SettingsField{Path: []string{"nonCritical", "networkViews", "ethereum", "lastSeenBlock"}, Value: big.NewInt(int64(fromChainLatestBlockNum)).String(), Type: "int"})
+	ctx.bridgeSettings.ProduceUpdate(ctx.pulsarCli, true)
 	return nil
 
 }
@@ -174,7 +173,7 @@ func (ctx *WardenContext) SeeEthBlock() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		err := ctx.seeEthBlock()
+		err := ctx.seeFromChainBlock()
 		if err != nil {
 			break
 		}
