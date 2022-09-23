@@ -4,7 +4,6 @@ import (
 	"WardenEtl/middleware"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net/http"
@@ -38,8 +37,7 @@ func (lbs *LocalBridgeSettings) InitSettings() {
 		Timeout: time.Second * 2,
 	}
 
-	url := fmt.Sprintf("http://127.0.0.1:8050/static/%s", os.Getenv("BridgeSettingsFilename"))
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, os.Getenv("BridgeSettingsFileURL"), nil)
 	if err != nil {
 		log.Fatal(err)
 	}
