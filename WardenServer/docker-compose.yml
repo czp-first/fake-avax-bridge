@@ -1,0 +1,9 @@
+version: "2"
+
+services:
+  warden-server:
+    build:
+      context: ../
+      dockerfile: WardenServer/Dockerfile
+
+# docker run -it --env-file wardens/warden1/dev.env  wardenserver_warden-server bash

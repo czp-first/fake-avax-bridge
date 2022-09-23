@@ -1,7 +1,7 @@
 version: "2"
 
 services:
-  enclave-proxy:
+  init-bridge:
     build:
       context: ../
       dockerfile: InitBridge/Dockerfile

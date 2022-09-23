@@ -1,0 +1,102 @@
+// ~/Documents/dx/code/dxBridgeDemo/warden » protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative wardenpb/warden.proto
+// python -m grpc_tools.protoc -I . --python_out=. --grpc_python_out=. warden.proto
+syntax = "proto3";
+
+option go_package = "/wardenpb";
+
+package wardenpb;
+
+service Warden {
+    // rpc GetBridgeSettings(Empty) returns () {}
+    rpc GetCredential(GetCredentialReq) returns (GetCredentialResp) {}
+    rpc GetAwsCredential(AwsCredentialReq) returns (AwsCredentialResp) {}
+    rpc SaveShare(SaveShareReq) returns (Empty) {}
+    rpc GetShare(Empty) returns (ShareResp) {}
+    rpc GetWardenOnboard(GetWardenOnboardReq) returns(GetWardenOnboardResp) {}
+    rpc Onboard(OnboardReq) returns(Empty) {}
+    rpc GetWardenOffboard(GetWardenOffboardReq) returns(GetWardenOffboardResp) {}
+    rpc Offboard(OffboardReq) returns(Empty) {}
+}
+
+message Empty {}
+
+message GetCredentialReq {
+    string identification = 1;
+}
+
+message GetCredentialResp {
+    string type = 1;
+    string credential = 2;
+}
+
+message AwsCredentialReq {
+    string identification = 1;
+}
+
+message AwsCredentialResp {
+    string accessKeyId = 1;
+    string secretAccessKey = 2;
+    string region = 3;
+    string kmsKeyId = 4;
+}
+
+message SaveShareReq {
+    string share = 1;
+    string onboardAccountAddress = 2;
+    string offboardAccountAddress = 3;
+}
+
+message ShareResp {
+    string identification = 1;
+    string share = 2;
+}
+
+message GetWardenOnboardReq {
+    string blockHash = 1;
+    string txnHash = 2;
+}
+
+message GetWardenOnboardResp {
+    uint64 chainId = 1;
+    uint64 realAmount = 2;
+    string account = 3;
+    uint64 gasPrice = 4;
+    uint64 nonce = 5;
+    string share = 6;
+    string contract = 7;
+    uint64 fee = 8;
+    bool is_eip1559 = 9;
+}
+
+message GetWardenOffboardReq {
+    string blockHash = 1;
+    string txnHash = 2;
+}
+
+message GetWardenOffboardResp {
+    uint64 chainId = 1;
+    uint64 realAmount = 2;
+    string account = 3;
+    uint64 gasPrice = 4;
+    uint64 nonce = 5;
+    string share = 6;
+    string contract = 7;
+    bool is_eip1559 = 8;
+}
+
+
+message OnboardReq {
+    string blockHash = 1;
+    string txnHash = 2;
+    string onboardTxnHash = 3;
+    uint64 nonce = 4;
+    int64 batch = 5;
+}
+
+message OffboardReq {
+    string blockHash = 1;
+    string txnHash = 2;
+    string offboardTxnHash = 3;
+    uint64 nonce = 4;
+    int64 batch = 5;
+}

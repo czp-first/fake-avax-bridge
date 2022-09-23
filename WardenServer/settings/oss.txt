@@ -1,0 +1,237 @@
+package settings
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"math/big"
+	"net/http"
+	"os"
+	"sync"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/bitly/go-simplejson"
+	"github.com/ethereum/go-ethereum/common"
+	log "github.com/sirupsen/logrus"
+)
+
+type BridgeSettings struct {
+	Settings             *simplejson.Json
+	Lock                 *sync.RWMutex
+	ChainTokenNameMap    map[uint64]map[common.Address]string
+	ChainTokenAddrMap    map[uint64]map[string]common.Address
+	OnboardAssetsConfig  AssetsConfig
+	OffboardAssetsConfig AssetsConfig
+	Wallets              Wallets
+	Networks             Networks
+}
+
+type AssetConfig struct {
+	ChainlinkFeedAddress common.Address
+	FeeDollars           int64
+	Name                 string
+	OtherChainContract   common.Address
+}
+
+type AssetsConfig struct {
+	Assets                     map[common.Address]AssetConfig
+	ChainlinkDxUsdFeedAddress  common.Address
+	ChainlinkEthUsdFeedAddress common.Address
+	CurrentEthPrice            *big.Int
+	CurrentDxPrice             *big.Int
+}
+
+type Wallets struct {
+	Ethereum common.Address
+	DxChain  common.Address
+}
+
+type Networks struct {
+	Ethereum uint64
+	DxChain  uint64
+}
+
+type S3PutObjectAPI interface {
+	PutObject(ctx context.Context,
+		params *s3.PutObjectInput,
+		optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+}
+
+func PutFile(c context.Context, api S3PutObjectAPI, input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	return api.PutObject(c, input)
+}
+
+func InitBridgeSettings() *BridgeSettings {
+	return &BridgeSettings{
+		Lock:              new(sync.RWMutex),
+		ChainTokenNameMap: make(map[uint64]map[common.Address]string),
+		ChainTokenAddrMap: make(map[uint64]map[string]common.Address),
+	}
+}
+
+func (bs *BridgeSettings) GetTokenAddrs(chainId uint64) []common.Address {
+	tokenMap := bs.ChainTokenNameMap[chainId]
+
+	tokensAddr := make([]common.Address, 0, len(tokenMap))
+	for tokenAddr := range tokenMap {
+		tokensAddr = append(tokensAddr, tokenAddr)
+	}
+	return tokensAddr
+}
+
+func (bs *BridgeSettings) GetSettings(nativeChainId, wrappedChainId uint64) error {
+
+	settingsPath := fmt.Sprintf(
+		"https://%s.s3.%s.amazonaws.com/%s",
+		os.Getenv("S3Bucket"),
+		os.Getenv("AWSRegion"),
+		os.Getenv("S3Filename"),
+	)
+	resp, err := http.Get(settingsPath)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+
+	settings, err := simplejson.NewJson(body)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	onboardAssetsConfig := AssetsConfig{
+		Assets:                     make(map[common.Address]AssetConfig),
+		ChainlinkEthUsdFeedAddress: common.HexToAddress(settings.GetPath("nonCritical", "chainlinkEthUsdFeedAddress").MustString()),
+		ChainlinkDxUsdFeedAddress:  common.HexToAddress(settings.GetPath("nonCritical", "chainlinkDxUsdFeedAddress").MustString()),
+		CurrentEthPrice:            big.NewInt(settings.GetPath("nonCritical", "currentEthPrice").MustInt64()),
+		CurrentDxPrice:             big.NewInt(settings.GetPath("nonCritical", "currentEthPrice").MustInt64()),
+	}
+
+	offboardAssetsConfig := AssetsConfig{
+		Assets:                     make(map[common.Address]AssetConfig),
+		ChainlinkEthUsdFeedAddress: common.HexToAddress(settings.GetPath("nonCritical", "chainlinkEthUsdFeedAddress").MustString()),
+		ChainlinkDxUsdFeedAddress:  common.HexToAddress(settings.GetPath("nonCritical", "chainlinkDxUsdFeedAddress").MustString()),
+		CurrentEthPrice:            big.NewInt(settings.GetPath("nonCritical", "currentEthPrice").MustInt64()),
+		CurrentDxPrice:             big.NewInt(settings.GetPath("nonCritical", "currentEthPrice").MustInt64()),
+	}
+
+	assets := settings.Get("critical").Get("assets").MustMap()
+
+	for assetName, assetInfo := range assets {
+		asset := assetInfo.(map[string]interface{})
+		onboardFeeDollars, _ := asset["onboardFeeDollars"].(json.Number).Int64()
+		onboardAssetConfig := AssetConfig{
+			Name:                 assetName,
+			ChainlinkFeedAddress: common.HexToAddress(asset["chainlinkFeedAddress"].(string)),
+			FeeDollars:           onboardFeeDollars,
+			OtherChainContract:   common.HexToAddress(asset["wrappedContractAddress"].(string)),
+		}
+		onboardAssetsConfig.Assets[common.HexToAddress(asset["nativeContractAddress"].(string))] = onboardAssetConfig
+
+		offboardFeeDollars, _ := asset["offboardFeeDollars"].(json.Number).Int64()
+		offboardAssetConfig := AssetConfig{
+			Name:                 assetName,
+			ChainlinkFeedAddress: common.HexToAddress(asset["chainlinkFeedAddress"].(string)),
+			FeeDollars:           offboardFeeDollars,
+			OtherChainContract:   common.HexToAddress(asset["nativeContractAddress"].(string)),
+		}
+		offboardAssetsConfig.Assets[common.HexToAddress(asset["wrappedContractAddress"].(string))] = offboardAssetConfig
+
+		nativeSubChainTokenNameMap, foundNativeSubChainTokenNameMap := bs.ChainTokenNameMap[nativeChainId]
+		if foundNativeSubChainTokenNameMap {
+			nativeSubChainTokenNameMap[common.HexToAddress(asset["nativeContractAddress"].(string))] = assetName
+		} else {
+			bs.ChainTokenNameMap[nativeChainId] = make(map[common.Address]string)
+			bs.ChainTokenNameMap[nativeChainId][common.HexToAddress(asset["nativeContractAddress"].(string))] = assetName
+		}
+
+		wrappedSubChainTokenNameMap, foundWrappedSubChainTokenNameMap := bs.ChainTokenNameMap[wrappedChainId]
+		if foundWrappedSubChainTokenNameMap {
+			wrappedSubChainTokenNameMap[common.HexToAddress(asset["wrappedContractAddress"].(string))] = assetName
+		} else {
+			bs.ChainTokenNameMap[wrappedChainId] = make(map[common.Address]string)
+			bs.ChainTokenNameMap[wrappedChainId][common.HexToAddress(asset["wrappedContractAddress"].(string))] = assetName
+		}
+
+		nativeSubChainTokenAddrMap, foundNativeSubChainTokenNameMap := bs.ChainTokenAddrMap[nativeChainId]
+		if !foundNativeSubChainTokenNameMap {
+			nativeSubChainTokenAddrMap = make(map[string]common.Address)
+			bs.ChainTokenAddrMap[nativeChainId] = nativeSubChainTokenAddrMap
+		}
+		nativeSubChainTokenAddrMap[assetName] = common.HexToAddress(asset["nativeContractAddress"].(string))
+
+		wrappedSubChainTokenAddrMap, foundWrappedSubChainTokenAddrMap := bs.ChainTokenAddrMap[wrappedChainId]
+		if !foundWrappedSubChainTokenAddrMap {
+			wrappedSubChainTokenAddrMap = make(map[string]common.Address)
+			bs.ChainTokenAddrMap[wrappedChainId] = wrappedSubChainTokenAddrMap
+		}
+		wrappedSubChainTokenAddrMap[assetName] = common.HexToAddress(asset["wrappedContractAddress"].(string))
+
+	}
+
+	bs.Settings = settings
+	bs.Wallets = Wallets{
+		Ethereum: common.HexToAddress(settings.GetPath("critical", "walletAddress", "ethereum").MustString()),
+		DxChain:  common.HexToAddress(settings.GetPath("critical", "walletAddress", "dxchain").MustString()),
+	}
+
+	bs.Networks = Networks{
+		Ethereum: nativeChainId,
+		DxChain:  wrappedChainId,
+	}
+
+	bs.OnboardAssetsConfig = onboardAssetsConfig
+	bs.OffboardAssetsConfig = offboardAssetsConfig
+
+	return nil
+}
+
+func (bs *BridgeSettings) UpdateSettings() error {
+
+	cfg, err := config.LoadDefaultConfig(
+		context.TODO(),
+		config.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
+				os.Getenv("AWSAccessKeyId"), os.Getenv("AWSAccessKeySecret"), "",
+			),
+		),
+		config.WithRegion(os.Getenv("AWSRegion")),
+	)
+	if err != nil {
+		return err
+	}
+
+	client := s3.NewFromConfig(cfg)
+
+	s_bytes, err := bs.Settings.MarshalJSON()
+	if err != nil {
+		return nil
+	}
+	bytes.NewReader(s_bytes)
+
+	input := &s3.PutObjectInput{
+		ACL:         types.ObjectCannedACLPublicRead,
+		Body:        bytes.NewReader(s_bytes),
+		Bucket:      aws.String(os.Getenv("S3Bucket")),
+		Key:         aws.String(os.Getenv("S3Filename")),
+		ContentType: aws.String("application/json"),
+	}
+
+	result, err := PutFile(context.TODO(), client, input)
+	if err != nil {
+		log.Errorf("Fail uploading file: %v\n", err)
+		return err
+	}
+
+	log.Infof("Upload settings resp:%v\n", result)
+	return nil
+
+}
