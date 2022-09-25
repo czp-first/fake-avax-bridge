@@ -6,9 +6,11 @@ import (
 	"os"
 
 	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chain"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
 	"github.com/czp-first/fake-avax-bridge/BridgeUtils/settings"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/sqldb"
 	"github.com/czp-first/fake-avax-bridge/WardenServer/credential"
-	"github.com/czp-first/fake-avax-bridge/WardenServer/database"
+	"github.com/czp-first/fake-avax-bridge/WardenServer/dal"
 	"github.com/czp-first/fake-avax-bridge/WardenServer/enclavecli"
 	pb "github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 
@@ -19,7 +21,7 @@ import (
 
 type WardenContext struct {
 	pb.UnimplementedWardenServer
-	db              *database.PgSQL
+	db              *dal.DAL
 	bridgeSettings  settings.BridgeSettingsInterface
 	FromChainClient *chain.ChainClient
 	ToChainClient   *chain.ChainClient
@@ -28,103 +30,138 @@ type WardenContext struct {
 	credential      credential.CredentialInterface
 }
 
-func NewWardenContext() (*WardenContext, error) {
-	return &WardenContext{}, nil
+func NewWardenContext() *WardenContext {
+	return &WardenContext{}
 }
 
-func (ctx *WardenContext) Init() {
+func (ctx *WardenContext) Init() error {
 	// init db
 	log.Infoln("Initializing DB...")
-	ctx.initDb()
+	err := ctx.initDb()
+	if err != nil {
+		log.Errorf("fail connect db, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully initialize DB")
 
 	// init bridgeSettings
 	log.Infoln("Initializing bridgeSettings...")
-	ctx.initBridgeSettings()
+	err = ctx.initBridgeSettings()
+	if err != nil {
+		log.Errorf("fail init bridge settings, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully initialize bridgeSettings")
 
 	log.Infoln("Connecting from chain client...")
-	ctx.initFromChainClient()
+	err = ctx.initFromChainClient()
+	if err != nil {
+		log.Errorf("fail connect from chain, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully connect from chain client")
 
 	log.Infoln("Connecting to chain client...")
-	ctx.initToChainClient()
+	err = ctx.initToChainClient()
+	if err != nil {
+		log.Errorf("fail connect to chain, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully connect to chain client")
 
 	log.Infoln("Instancing pulsar client...")
-	ctx.initPulsarCli()
+	err = ctx.initPulsarCli()
+	if err != nil {
+		log.Errorf("fail create pulsar client, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully initialize pulsar client")
 
 	log.Infoln("Instancing enclave proxy client...")
-	ctx.initEnclaveClient()
+	err = ctx.initEnclaveClient()
+	if err != nil {
+		log.Errorf("fail create enclave client, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully instance enclave proxy client")
 
 	log.Infoln("Initializing credential...")
-	ctx.initCredential()
+	err = ctx.initCredential()
+	if err != nil {
+		log.Errorf("fail load credential, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully initialize credential")
+	return nil
 }
 
-func (ctx *WardenContext) initDb() {
+func (ctx *WardenContext) initDb() error {
 	var err error
 	// init db
-	ctx.db, err = database.NewPgSQL()
+	ctx.db, err = dal.NewDAL(sqldb.PostgresDriver, fmt.Sprint(sqldb.PostgresFmt, os.Getenv("PgUser"), os.Getenv("PgPassword"), fmt.Sprintf("%s:%s", os.Getenv("PgHost"), os.Getenv("PgPort")), os.Getenv("PgDb")), sqldb.DefaultPostgresPoolSize)
 	if err != nil {
-		log.Fatalf("Fail initialize DB")
+		return err
 	}
+	return nil
 }
 
-func (ctx *WardenContext) initFromChainClient() {
+func (ctx *WardenContext) initFromChainClient() error {
 	var err error
 	ctx.FromChainClient, err = chain.NewChainClient(os.Getenv("FromChainHttps"), os.Getenv("FromChainWss"))
 	if err != nil {
-		log.Fatalf("Fail connect from chain client: %v", err)
+		return err
 	}
+	return nil
 }
 
-func (ctx *WardenContext) initToChainClient() {
+func (ctx *WardenContext) initToChainClient() error {
 	var err error
 	ctx.ToChainClient, err = chain.NewChainClient(os.Getenv("ToChainHttps"), os.Getenv("ToChainWss"))
 	if err != nil {
-		log.Fatalf("Fail connect to chain client : %v", err)
+		return err
 	}
+	return nil
 }
 
-func (ctx *WardenContext) initBridgeSettings() {
+func (ctx *WardenContext) initBridgeSettings() error {
 	bridgeSettingsFactory, err := settings.GetBridgeSettingsFactory()
 	if err != nil {
-		log.Fatalf("Fail initialize bridge settings: %v", err)
+		return err
 	}
 	bridgeSettings := bridgeSettingsFactory.MakeSettings()
 	bridgeSettings.InitSettings()
 	bridgeSettings.Get()
 
 	ctx.bridgeSettings = bridgeSettings
+	return nil
 }
 
-func (ctx *WardenContext) initPulsarCli() {
-	pulsarCli, err := createClient()
+func (ctx *WardenContext) initPulsarCli() error {
+	pulsarCli, err := middleware.CreatePulsarClient()
 	if err != nil {
-		log.Fatalf("fail create pulsar client: %v", err)
+		return err
 	}
 	ctx.pulsarCli = pulsarCli
+	return nil
 }
 
-func (ctx *WardenContext) initEnclaveClient() {
+func (ctx *WardenContext) initEnclaveClient() error {
 	var err error
 	ctx.Enclave, err = enclavecli.NewEnclaveAPI(os.Getenv("EnclaveRPC"))
 	if err != nil {
-		log.Fatalln("Fail to connect enclave server:", err)
+		return err
 	}
+	return nil
 }
 
-func (ctx *WardenContext) initCredential() {
+func (ctx *WardenContext) initCredential() error {
 	credentialFactory, err := credential.GetCredential()
 	if err != nil {
-		log.Fatalf("fail initialize credential: %v", err)
+		return err
 	}
 	credential := credentialFactory.MakeCredential()
 	ctx.credential = credential
-
+	return nil
 }
 
 func NewServer(ctx *WardenContext) {

@@ -168,7 +168,7 @@ func (ctx *WardenContext) seeFromChainBlock() error {
 
 }
 
-func (ctx *WardenContext) SeeEthBlock() {
+func (ctx *WardenContext) SeeFromChainBlock() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 

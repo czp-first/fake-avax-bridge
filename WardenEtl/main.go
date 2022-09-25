@@ -39,13 +39,9 @@ func main() {
 
 	ctx.Init()
 
-	go ctx.SeeEthBlock()
+	go ctx.SeeFromChainBlock()
 
 	// go ctx.SeeDxchainBlock()
-	// go ctx.ConsumeOffboardTxn()
-
-	// go ctx.MonitorOffboard()
-	// go ctx.ConfirmOffboard()
 
 	for {
 		time.Sleep(5 * time.Second)

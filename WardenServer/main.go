@@ -23,22 +23,24 @@ func main() {
 		log.Infof("Initializing env..., envfile[%s]", envFile)
 		err := godotenv.Load(envFile)
 		if err != nil {
-			log.Fatalf("Fail initialize env: %v\n", err)
+			log.Fatalf("Fail initialize env: %v", err)
 		}
 		log.Info("Successfully initialize env")
 	}
 
-	ctx, err := core.NewWardenContext()
-	if err != nil {
-		panic("create context error!")
-	}
+	ctx := core.NewWardenContext()
 
-	ctx.Init()
+	err := ctx.Init()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
 	go ctx.MonitorOnboard()
 	log.Info("monitoring onboard...")
 	go ctx.ConfirmOnboard()
 	log.Info("confirm onboard...")
+
 	log.Infoln("warden node successfully starts")
 
 	core.NewServer(ctx)

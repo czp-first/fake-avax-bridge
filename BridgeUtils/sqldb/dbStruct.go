@@ -1,6 +1,14 @@
-package database
+package sqldb
 
 import "math/big"
+
+const (
+	INIT    = "init"
+	PEDNING = "pending"
+	DONE    = "done"
+	NORMAL  = "normal"
+	TIMEOUT = "timeout"
+)
 
 type WardenOnboard struct {
 	RowId          int64

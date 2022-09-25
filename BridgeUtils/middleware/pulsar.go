@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"math/big"
 	"os"
 	"time"
@@ -65,14 +64,14 @@ var (
 		{"name":"Path","type":{"type":"array","items":"string"}}]}}}]}`
 )
 
-func CreatePulsarClient() pulsar.Client {
+func CreatePulsarClient() (pulsar.Client, error) {
 	client, err := pulsar.NewClient(pulsar.ClientOptions{
 		URL:               os.Getenv("PulsarURL"),
 		OperationTimeout:  30 * time.Second,
 		ConnectionTimeout: 30 * time.Second,
 	})
 	if err != nil {
-		log.Fatalf("Could not instance Pulsar client: %v", err)
+		return nil, err
 	}
-	return client
+	return client, nil
 }

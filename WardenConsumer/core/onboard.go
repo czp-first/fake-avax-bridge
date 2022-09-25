@@ -38,26 +38,29 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 
 		log.Infof("Received message msgId: %#v -- content: '%s'", msg.ID(), string(msg.Payload()))
 
-		handlerTx, err := ctx.db.GetDB().Begin()
-		if err != nil {
-			log.Fatalf("DB error: %v", err)
-		}
+		// TODO: db transaction
+		// handlerTx, err := ctx.db.GetDB().Begin()
+		// if err != nil {
+		// 	log.Fatalf("DB error: %v", err)
+		// }
 
 		switch onboardTxn.Type {
 		// receive onboard txn from enclave
 		case middleware.Enclave:
-			err = ctx.db.EnclaveOnboard(
-				onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.OnboardTxnHash, onboardTxn.Nonce, onboardTxn.Batch, handlerTx,
-			)
+			err = ctx.db.InsertNomalEnclaveOnboard(
+				onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.OnboardTxnHash, onboardTxn.Nonce, onboardTxn.Batch)
 			if err != nil {
-				handlerTx.Rollback()
-				log.Fatalf("DB error: %v", err)
+				log.Fatalf("DB error:%v", err)
 			}
-			err = handlerTx.Commit()
-			if err != nil {
-				handlerTx.Rollback()
-				log.Fatalf("DB error: %v", err)
-			}
+			// if err != nil {
+			// 	handlerTx.Rollback()
+			// 	log.Fatalf("DB error: %v", err)
+			// }
+			// err = handlerTx.Commit()
+			// if err != nil {
+			// 	handlerTx.Rollback()
+			// 	log.Fatalf("DB error: %v", err)
+			// }
 			consumer.Ack(msg)
 			continue
 		// receive onboard txn from warden
@@ -72,45 +75,42 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 				continue
 			}
 
-			enclaveOnboard, err := ctx.db.SelectEnclaveOnboard(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
+			enclaveOnboard, found, err := ctx.db.GetEnclaveOnboardByHashBatch(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
 			if err != nil {
 				log.Fatalf("DB error: %v", err)
 			}
-			if enclaveOnboard != nil {
+
+			if found {
 				err = ctx.db.InsertPendingWardenOnboard(
 					onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.ContractAddress, onboardTxn.AccountAddress,
 					enclaveOnboard.OnboardTxnHash, onboardTxn.BlockNumber, enclaveOnboard.Nonce, onboardTxn.Batch,
-					onboardTxn.TxnIndex, onboardTxn.ChainId, onboardTxn.Amount,
-					handlerTx,
-				)
+					onboardTxn.TxnIndex, onboardTxn.ChainId, onboardTxn.Amount)
 				if err != nil {
-					handlerTx.Rollback()
+					// handlerTx.Rollback()
 					log.Fatalf("DB error: %v", err)
 				}
-				err = handlerTx.Commit()
-				if err != nil {
-					handlerTx.Rollback()
-					log.Fatalf("DB error: %v", err)
-				}
+				// err = handlerTx.Commit()
+				// if err != nil {
+				// 	handlerTx.Rollback()
+				// 	log.Fatalf("DB error: %v", err)
+				// }
 				consumer.Ack(msg)
 				continue
 			}
 
-			err = ctx.db.InsertWardenOnboard(
+			err = ctx.db.InsertInitWardenOnboard(
 				onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.ContractAddress, onboardTxn.AccountAddress,
-				onboardTxn.ChainId, onboardTxn.Amount, onboardTxn.BlockNumber, onboardTxn.Batch, onboardTxn.TxnIndex,
-				handlerTx,
-			)
+				onboardTxn.ChainId, onboardTxn.Amount, onboardTxn.BlockNumber, onboardTxn.Batch, onboardTxn.TxnIndex)
+
 			if err != nil {
-				handlerTx.Rollback()
+				// handlerTx.Rollback()
 				log.Fatal("DB error: %v", err)
 			}
-
-			err = handlerTx.Commit()
-			if err != nil {
-				handlerTx.Rollback()
-				log.Fatalf("DB error: %v", err)
-			}
+			// err = handlerTx.Commit()
+			// if err != nil {
+			// 	handlerTx.Rollback()
+			// 	log.Fatalf("DB error: %v", err)
+			// }
 			consumer.Ack(msg)
 			continue
 
@@ -126,46 +126,42 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 				continue
 			}
 
-			enclaveOnboard, err := ctx.db.SelectEnclaveOnboard(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
+			enclaveOnboard, found, err := ctx.db.GetEnclaveOnboardByHashBatch(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
 			if err != nil {
 				log.Fatalf("DB error: %v", err)
 			}
-			if enclaveOnboard != nil {
+			if found {
 				err = ctx.db.InsertPendingWardenOnboard(
 					onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.ContractAddress, onboardTxn.AccountAddress, enclaveOnboard.OnboardTxnHash,
 					onboardTxn.BlockNumber, enclaveOnboard.Nonce, onboardTxn.Batch, onboardTxn.TxnIndex,
-					onboardTxn.ChainId, onboardTxn.Amount,
-					handlerTx,
-				)
+					onboardTxn.ChainId, onboardTxn.Amount)
 				if err != nil {
-					handlerTx.Rollback()
+					// handlerTx.Rollback()
 					log.Fatalf("DB error: %v", err)
 				}
 
-				err = handlerTx.Commit()
-				if err != nil {
-					handlerTx.Rollback()
-					log.Fatalf("DB error: %v", err)
-				}
+				// err = handlerTx.Commit()
+				// if err != nil {
+				// 	handlerTx.Rollback()
+				// 	log.Fatalf("DB error: %v", err)
+				// }
 				consumer.Ack(msg)
 				continue
 			}
 
-			err = ctx.db.InsertWardenOnboard(
+			err = ctx.db.InsertInitWardenOnboard(
 				onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.ContractAddress, onboardTxn.AccountAddress,
-				onboardTxn.ChainId, onboardTxn.Amount, onboardTxn.BlockNumber, onboardTxn.Batch, onboardTxn.TxnIndex,
-				handlerTx,
-			)
+				onboardTxn.ChainId, onboardTxn.Amount, onboardTxn.BlockNumber, onboardTxn.Batch, onboardTxn.TxnIndex)
 			if err != nil {
-				handlerTx.Rollback()
+				// handlerTx.Rollback()
 				log.Fatalf("DB error: %v", err)
 			}
 
-			err = handlerTx.Commit()
-			if err != nil {
-				handlerTx.Rollback()
-				log.Fatalf("DB error: %v", err)
-			}
+			// err = handlerTx.Commit()
+			// if err != nil {
+			// 	handlerTx.Rollback()
+			// 	log.Fatalf("DB error: %v", err)
+			// }
 			consumer.Ack(msg)
 			continue
 		}

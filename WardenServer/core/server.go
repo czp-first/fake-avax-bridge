@@ -18,7 +18,9 @@ import (
 	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chain"
 	"github.com/czp-first/fake-avax-bridge/BridgeUtils/chainlinkfeed"
 	"github.com/czp-first/fake-avax-bridge/BridgeUtils/contracts"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/middleware"
 	"github.com/czp-first/fake-avax-bridge/BridgeUtils/settings"
+	"github.com/czp-first/fake-avax-bridge/BridgeUtils/sqldb"
 	pb "github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 )
 
@@ -56,7 +58,6 @@ func (c *WardenContext) GetAwsCredential(ctx context.Context, in *pb.AwsCredenti
 
 // warden save share from enclave
 func (c *WardenContext) SaveShare(ctx context.Context, in *pb.SaveShareReq) (*pb.Empty, error) {
-
 	decryptText := c.credential.Decrypt(in.GetShare())
 
 	err := ioutil.WriteFile(os.Getenv("ShareFilePath"), []byte(decryptText), 0644)
@@ -64,24 +65,26 @@ func (c *WardenContext) SaveShare(ctx context.Context, in *pb.SaveShareReq) (*pb
 		return nil, err
 	}
 
-	jsonSchema := pulsar.NewJSONSchema(settingsSchemaDef, nil)
+	jsonSchema := pulsar.NewJSONSchema(middleware.SettingsSchemaDef, nil)
 	producer, err := c.pulsarCli.CreateProducer(pulsar.ProducerOptions{
 		Topic:  os.Getenv("PulsarSettingsTopic"),
 		Schema: jsonSchema,
 	})
 	if err != nil {
-		log.Fatalf("Could not instance producer: %v", err)
+		log.Errorf("Could not instance producer: %v", err)
+		return nil, err
 	}
 	defer producer.Close()
 
-	fields := &SettingsJSON{Fields: make([]*SettingsField, 0)}
-	fields.Fields = append(fields.Fields, &SettingsField{Path: []string{"critical", "walletAddress", "ethereum"}, Value: in.GetOnboardAccountAddress(), Type: "string"})
-	fields.Fields = append(fields.Fields, &SettingsField{Path: []string{"critical", "walletAddress", "dxchain"}, Value: in.GetOffboardAccountAddress(), Type: "string"})
+	fields := &middleware.SettingsJSON{Fields: make([]*middleware.SettingsField, 0)}
+	fields.Fields = append(fields.Fields, &middleware.SettingsField{Path: []string{"critical", "walletAddress", "ethereum"}, Value: in.GetOnboardAccountAddress(), Type: "string"})
+	fields.Fields = append(fields.Fields, &middleware.SettingsField{Path: []string{"critical", "walletAddress", "dxchain"}, Value: in.GetOffboardAccountAddress(), Type: "string"})
 	_, err = producer.Send(context.Background(), &pulsar.ProducerMessage{
 		Value: fields,
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("produce msg, err:%v", err)
+		return nil, err
 	}
 	log.Info("publish message ok")
 
@@ -114,7 +117,15 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 	s.bridgeSettings.InitSettings()
 	s.bridgeSettings.Get()
 
-	wardenOnboard := s.db.SelectWardenOnboard(in.BlockHash, in.TxnHash)
+	wardenOnboard, exist, err := s.db.GetWardenOnboardByHash(in.BlockHash, in.TxnHash)
+	if err != nil {
+		log.Errorf("fail get warden onboard by hash, err:%v", err)
+		return nil, err
+	}
+	if !exist {
+		log.Error("get no warden onboard by hash")
+		return nil, sqldb.ErrNoRows
+	}
 
 	assets := s.bridgeSettings.GetSettings().Critical.Assets
 	var asset settings.Asset
@@ -193,7 +204,7 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 
 func (s *WardenContext) Onboard(ctx context.Context, in *pb.OnboardReq) (*pb.Empty, error) {
 
-	jsonSchema := pulsar.NewJSONSchema(onboardTxnSchemaDef, nil)
+	jsonSchema := pulsar.NewJSONSchema(middleware.OnboardTxnSchemaDef, nil)
 	producer, err := s.pulsarCli.CreateProducer(pulsar.ProducerOptions{
 		Topic:  os.Getenv("PulsarTopic"),
 		Schema: jsonSchema,
@@ -203,8 +214,8 @@ func (s *WardenContext) Onboard(ctx context.Context, in *pb.OnboardReq) (*pb.Emp
 	}
 	defer producer.Close()
 	_, err = producer.Send(context.Background(), &pulsar.ProducerMessage{
-		Value: &OnboardTxnJSON{
-			Type:            Enclave,
+		Value: &middleware.OnboardTxnJSON{
+			Type:            middleware.Enclave,
 			BlockHash:       in.BlockHash,
 			TxnHash:         in.TxnHash,
 			ContractAddress: "",
@@ -226,13 +237,21 @@ func (s *WardenContext) Onboard(ctx context.Context, in *pb.OnboardReq) (*pb.Emp
 }
 
 func (s *WardenContext) GetWardenOffboard(ctx context.Context, in *pb.GetWardenOffboardReq) (*pb.GetWardenOffboardResp, error) {
-	wardenOffboard := s.db.SelectWardenOffboard(in.BlockHash, in.TxnHash)
+	wardenOffboard, exist, err := s.db.GetWardenOffboardByHash(in.BlockHash, in.TxnHash)
+	if err != nil {
+		log.Errorf("fail get warden offboard by hash, err:%v", err)
+		return nil, err
+	}
+	if !exist {
+		log.Error("get no warden offboard by hash")
+		return nil, sqldb.ErrNoRows
+	}
 
 	bridgeSettings := s.bridgeSettings.GetSettings()
 	var asset settings.Asset
 	for assetName, assetInfo := range bridgeSettings.Critical.Assets {
 		if assetInfo.WrappedContractAddress.Hex() == wardenOffboard.Contract {
-			log.Infof("Get %s warden offboard txn\n", assetName)
+			log.Infof("Get %s warden offboard txn", assetName)
 			asset = assetInfo
 			break
 		}
@@ -247,7 +266,7 @@ func (s *WardenContext) GetWardenOffboard(ctx context.Context, in *pb.GetWardenO
 	} else {
 		currentTokenPrice, _ = chainlinkfeed.GetFeedData(chainlinkFeedAddress)
 	}
-	log.Infof("currentTokenPrice:%v\n", currentTokenPrice)
+	log.Infof("currentTokenPrice:%v", currentTokenPrice)
 
 	// TODO
 	client, err := ethclient.Dial(os.Getenv("ETHHttps"))

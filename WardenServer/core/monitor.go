@@ -21,7 +21,7 @@ func (ctx *WardenContext) monitorWardenOnboard() error {
 	// lastSeenBlockNum := settings.NonCritical.NetworkViews.Ethereum.LastSeenBlock
 
 	// // select the oldest pending warden onboard
-	// oldestPendingWardenOnboard, err := ctx.db.RetrieveOldestPendingWardenOnboard()
+	// oldestPendingWardenOnboard, err := ctx.db.GetOldestPendingWardenOnboard()
 	// if err != nil {
 	// 	log.Errorf("DB error: %v\n", err)
 	// 	return
@@ -95,12 +95,12 @@ func (ctx *WardenContext) monitorWardenOnboard() error {
 	// 	return
 	// }
 
-	oldestInitWardenOnboard, err := ctx.db.RetrieveOldestInitWardenOnboard()
+	oldestInitWardenOnboard, found, err := ctx.db.GetOldestInitWardenOnboard()
 	if err != nil {
 		log.Errorf("monitor onboard: retrieve oldest init warden onboard: %v", err)
 		return err
 	}
-	if oldestInitWardenOnboard == nil {
+	if !found {
 		log.Infoln("monitor onboard: No init onboard txn")
 		return nil
 	}
@@ -121,25 +121,12 @@ func (ctx *WardenContext) monitorWardenOnboard() error {
 	)
 	log.Infof("monitor onboard: Enclave resp onboard txn status: %v", resp.Status)
 
-	handlerTx, err := ctx.db.GetDB().Begin()
-	if err != nil {
-		log.Errorf("monitor onboard: start DB error: %v", err)
-		return err
-	}
-
-	err = ctx.db.UpdateWardenOnboardStatusById(oldestInitWardenOnboard.RowId, resp.Status, handlerTx)
+	err = ctx.db.UpdateWardenOnboardStatusById(oldestInitWardenOnboard.RowId, resp.Status)
 	if err != nil {
 		log.Errorf("monitor onboard: update warden onboard status by id error: %v", err)
-		handlerTx.Rollback()
 		return err
 	}
 
-	err = handlerTx.Commit()
-	if err != nil {
-		log.Errorf("monitor onboard: pg commit error :%v", err)
-		handlerTx.Rollback()
-		return err
-	}
 	return nil
 }
 
