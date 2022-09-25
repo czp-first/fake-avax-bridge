@@ -2,18 +2,18 @@
 """
 @Summary : docstr
 @Author  : Rey
-@Time    : 2022-07-12 18:03:09
-@Run     : python -m unittest tests/crypto/test_local.py
+@Time    : 2022-09-25 22:19:48
+@Run     : python -m unittest tests/crypto/test_adapter.py
 """
 
 import json
 import sqlite3
 import unittest
 
-from crypto.local import LocalCrypto
+from crypto.adapter import get_crypto_obj
 
 
-class TestLocalCrypto(unittest.TestCase):
+class TestGetCryptoObj(unittest.TestCase):
 
     def setUp(self) -> None:
         self.conn = sqlite3.connect(":memory:")
@@ -25,13 +25,27 @@ class TestLocalCrypto(unittest.TestCase):
         cursor.execute("INSERT INTO warden(identification, credential)VALUES(?, ?)", (self.identification, self.credential))
         cursor.close()
 
-    def test_1(self):
-        obj = LocalCrypto(self.identification, self.conn)
+    def test_local(self):
+        cursor = self.conn.cursor()
+        cursor.execute("INSERT INTO config(key, value)VALUES(?, ?)", ("crypto_way", "local"))
+        cursor.close()
+
+        obj = get_crypto_obj(self.identification, self.conn)
         plaintext = "immsg"
         ciphertext = obj.encrypt(plaintext)
 
         result = obj.decrypt(ciphertext)
         assert plaintext == result
+
+    @unittest.skip("todo")
+    def test_kms(self):
+        ...
+
+    def test_unknow_type(self):
+        cursor = self.conn.cursor()
+        cursor.execute("INSERT INTO config(key, value)VALUES(?, ?)", ("crypto_way", "ali"))
+        cursor.close()
+        self.assertRaises(TypeError, get_crypto_obj, self.identification, self.conn)
 
     def tearDown(self) -> None:
         self.conn.close()

@@ -12,7 +12,7 @@ class EnclaveSettings(BaseSettings):
     shamir_path: str
     warden_path: str
     fee_address: str
-    crypto_way: str
+    # crypto_way: str
 
     default_gas: int
     max_fee_per_gas: int

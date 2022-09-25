@@ -1,12 +1,24 @@
-create table enclave(
 
-)
+create table enclave_onboard_txn(
+    id integer PRIMARY KEY,
+    block_hash text not null,
+    transaction_hash text not null,
+    batch int not null,
+    status text not null,
+    wardens text not null
+);
 
-create table transaction(
-    block_hash varchar(66) not null,
-    transaction_hash varchar(66) not null,
-    batch integer not null,
-    status varchar(66) not null
-    -- UNIQUE(block_hash, transaction_hash, batch)
-)
+-- create unique index blk_txn_batch on transaction(block_hash, transaction_hash, batch);
+
+create table warden(
+    id integer primary key,
+    identification varchar(64) unique not null,
+    credential text not null
+);
+
+create table config(
+    id integet PRIMARY KEY,
+    key varchar(64) unique not null,
+    value varchar(64) not null
+);
 

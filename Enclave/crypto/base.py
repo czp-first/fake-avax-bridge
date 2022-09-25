@@ -8,14 +8,16 @@
 from abc import ABCMeta, abstractmethod
 import json
 
-from settings import enclave_settings
-
 
 class Crypto(metaclass=ABCMeta):
 
-    def __init__(self, identification: str) -> None:
-        with open(f'{enclave_settings.warden_path}/{identification}.warden', 'r') as f:
-            self.warden_info = json.load(f)
+    def __init__(self, identification: str, db_conn) -> None:
+        cursor = db_conn.cursor()
+        cursor.execute("SELECT credential FROM warden WHERE identification=?", (identification,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError("uknown identification")
+        self.credential = json.loads(row[0])
 
     @abstractmethod
     def encrypt(self, plaintext: str):
