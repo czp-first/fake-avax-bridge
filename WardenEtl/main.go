@@ -37,7 +37,11 @@ func main() {
 		panic("create context error!")
 	}
 
-	ctx.Init()
+	err = ctx.Init()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
 	go ctx.SeeFromChainBlock()
 

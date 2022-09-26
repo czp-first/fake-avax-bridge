@@ -3,6 +3,7 @@
 @Summary : docstr
 @Author  : Rey
 @Time    : 2022-07-12 22:57:58
+@Run     : python -m unittest tests/shamir/test_shamir.py
 """
 
 from itertools import combinations
@@ -18,4 +19,4 @@ class TestShamir(unittest.TestCase):
         mnemonic = generate_mnemonic()
         shares = split(3, 2, mnemonic)
         for item in combinations(shares, 2):
-             assert mnemonic == combine(",".join(item))
+            assert mnemonic == combine(",".join(item))

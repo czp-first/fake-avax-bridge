@@ -16,6 +16,7 @@ class EnclaveSettings(BaseSettings):
 
     default_gas: int
     max_fee_per_gas: int
+    db_path: str = "db/enclave.db"
 
     class Config:
         env_file = '.env'

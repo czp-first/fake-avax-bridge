@@ -6,10 +6,8 @@
 """
 
 from enum import Enum
-import json
-import sqlite3
 
-# from loguru import logger
+from loguru import logger
 
 from crypto.adapter import get_crypto_obj
 import wallet
@@ -29,7 +27,7 @@ def store_credential(share_version: int, threshold: int, wardens: list, from_cha
     configs = []
     for warden in wardens:
         crypto_way.add(warden["type"])
-        wardens_info.append((warden["identification"], json.dumps(warden["credential"])))
+        wardens_info.append((warden["identification"], warden["credential"]))
     if len(crypto_way) != 1:
         raise ValueError(f"crypto way is not a consensus: {crypto_way}")
 
@@ -42,6 +40,7 @@ def store_credential(share_version: int, threshold: int, wardens: list, from_cha
     cursor.close()
 
     wallet_info = wallet.init_wallet(len(wardens), threshold, from_chain_id, to_chain_id)
+    logger.info("wallet info: {}", wallet_info)
     if share_version == 0:
         encrypt_shares = [
             {

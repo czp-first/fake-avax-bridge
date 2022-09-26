@@ -7,4 +7,4 @@ services:
       dockerfile: InitBridge/Dockerfile
     # command: ./InitBridge -e dev.env
 
-# docker run -it --env-file dev.env initbirdge_init-birdge bash
+# docker run -it --env-file dev.env initbridge_init-bridge ./InitBridge

@@ -17,7 +17,7 @@ create table warden(
 );
 
 create table config(
-    id integet PRIMARY KEY,
+    id integer PRIMARY KEY,
     key varchar(64) unique not null,
     value varchar(64) not null
 );

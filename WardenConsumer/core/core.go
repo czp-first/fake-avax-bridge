@@ -29,7 +29,7 @@ func (ctx *ConsumerContext) initDb() error {
 	// init db
 	ctx.db, err = dal.NewDAL(
 		sqldb.PostgresDriver,
-		fmt.Sprint(
+		fmt.Sprintf(
 			sqldb.PostgresFmt,
 			os.Getenv("PgUser"),
 			os.Getenv("PgPassword"),
@@ -42,7 +42,7 @@ func (ctx *ConsumerContext) initDb() error {
 }
 
 func (ctx *ConsumerContext) initPulsarCli() error {
-	puslarCli, err := middleware.CreatePulsarClient()
+	puslarCli, err := middleware.CreatePulsarClient(os.Getenv("PulsarURL"))
 	if err != nil {
 		return err
 	}

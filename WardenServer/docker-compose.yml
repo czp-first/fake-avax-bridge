@@ -6,4 +6,6 @@ services:
       context: ../
       dockerfile: WardenServer/Dockerfile
 
-# docker run -it --env-file wardens/warden1/dev.env  wardenserver_warden-server bash
+# docker run -it --env-file wardens/warden1/dev.env -p 50051:50051  wardenserver_warden-server ./WardenServer
+# docker run -it --env-file wardens/warden2/dev.env -p 50052:50052  wardenserver_warden-server ./WardenServer
+# docker run -it --env-file wardens/warden3/dev.env -p 50053:50053  wardenserver_warden-server ./WardenServer

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -64,9 +63,9 @@ var (
 		{"name":"Path","type":{"type":"array","items":"string"}}]}}}]}`
 )
 
-func CreatePulsarClient() (pulsar.Client, error) {
+func CreatePulsarClient(url string) (pulsar.Client, error) {
 	client, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL:               os.Getenv("PulsarURL"),
+		URL:               url,
 		OperationTimeout:  30 * time.Second,
 		ConnectionTimeout: 30 * time.Second,
 	})

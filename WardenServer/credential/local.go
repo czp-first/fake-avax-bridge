@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -44,7 +45,7 @@ func (lc *LocalCredential) Encrypt(plaintext string) string {
 		log.Fatal(err)
 	}
 
-	url := "http://127.0.0.1:8050/encrypt"
+	url := fmt.Sprintf("%s/encrypt", os.Getenv("CryptoURL"))
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(json_data))
 	if err != nil {
@@ -75,7 +76,7 @@ func (lc *LocalCredential) Decrypt(ciphertext string) string {
 		log.Fatal(err)
 	}
 
-	url := "http://127.0.0.1:8050/decrypt"
+	url := fmt.Sprintf("%s/decrypt", os.Getenv("CryptoURL"))
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(json_data))
 	if err != nil {

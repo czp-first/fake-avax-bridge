@@ -26,56 +26,75 @@ func NewWardenContext() (*WardenContext, error) {
 }
 
 // create pulsar client
-func (ctx *WardenContext) initPulsarCli() {
-	ctx.pulsarCli = middleware.CreatePulsarClient()
+func (ctx *WardenContext) initPulsarCli() error {
+	pulsarClient, err := middleware.CreatePulsarClient(os.Getenv("PulsarURL"))
+	if err != nil {
+		return err
+	}
+	ctx.pulsarCli = pulsarClient
+	return nil
 }
 
 // connect from chain
-func (ctx *WardenContext) initFromChainClient() {
+func (ctx *WardenContext) initFromChainClient() error {
 	var err error
 	ctx.FromChainClient, err = chain.NewChainClient(os.Getenv("FromChainHttps"), os.Getenv("FromChainWss"))
-	if err != nil {
-		log.Fatalf("Fail connect from chain client: %v", err)
-	}
+	return err
 }
 
 // connect to chain
-func (ctx *WardenContext) initToChainClient() {
+func (ctx *WardenContext) initToChainClient() error {
 	var err error
 	ctx.ToChainClient, err = chain.NewChainClient(os.Getenv("ToChainHttps"), os.Getenv("ToChainWss"))
-	if err != nil {
-		log.Fatalf("Fail connect to chain client : %v", err)
-	}
+	return err
 }
 
 // init bridge settings
-func (ctx *WardenContext) initBridgeSettings() {
+func (ctx *WardenContext) initBridgeSettings() error {
 	bridgeSettingsFactory, err := settings.GetBridgeSettingsFactory()
 	if err != nil {
-		log.Fatalf("Fail initialize bridge settings: %v", err)
+		return err
 	}
 	bridgeSettings := bridgeSettingsFactory.MakeSettings()
 
 	ctx.bridgeSettings = bridgeSettings
+	return nil
 }
 
-func (ctx *WardenContext) Init() {
-
+func (ctx *WardenContext) Init() error {
+	var err error
 	log.Infoln("Initializing bridgeSettings...")
-	ctx.initBridgeSettings()
+	err = ctx.initBridgeSettings()
+	if err != nil {
+		log.Errorf("fail init bridge settings, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully initialize bridgeSettings")
 
 	log.Infoln("Connecting from chain client...")
-	ctx.initFromChainClient()
+	err = ctx.initFromChainClient()
+	if err != nil {
+		log.Errorf("fail connect from chain, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully connect from chain client")
 
 	log.Infoln("Connecting to chain client...")
-	ctx.initToChainClient()
+	err = ctx.initToChainClient()
+	if err != nil {
+		log.Errorf("fail connect to chain, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully connect to chain client")
 
 	log.Infoln("Instancing pulsar client...")
-	ctx.initPulsarCli()
+	err = ctx.initPulsarCli()
+	if err != nil {
+		log.Errorf("fail create pulsar client, err:%v", err)
+		return err
+	}
 	log.Infoln("Successfully initialize pulsar client")
+	return nil
 }
 
 // func Close(ctx *WardenContext) error {

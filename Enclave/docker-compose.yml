@@ -3,8 +3,10 @@ version: "2"
 services:
   enclave:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: ./Enclave/Dockerfile
     command: python server.py
     ports:
       - 8000:8000
+
+# docker-compose up --build

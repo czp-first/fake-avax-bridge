@@ -1,13 +1,22 @@
+# -*- coding: UTF-8 -*-
+"""
+@Summary : docstr
+@Author  : Rey
+@Time    : 2022-09-26 09:42:22
+"""
+
 import json
 import socket
+import sqlite3
 
 from loguru import logger
 
 from routes import ROUTES_MAP
+from settings import enclave_settings
 
 
 ENCLAVE_PORT = 8000
-ip = '127.0.0.1'
+ip = '0.0.0.0'
 
 
 def main():
@@ -38,6 +47,8 @@ def main():
         if not handler:
             resp = {}
         else:
+            db_conn = sqlite3.connect(enclave_settings.db_path)
+            client_request["body"]["db_conn"] = db_conn
             resp = handler(**client_request['body'])
 
         logger.info({'resp': resp})

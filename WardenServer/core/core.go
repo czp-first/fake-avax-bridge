@@ -98,7 +98,7 @@ func (ctx *WardenContext) Init() error {
 func (ctx *WardenContext) initDb() error {
 	var err error
 	// init db
-	ctx.db, err = dal.NewDAL(sqldb.PostgresDriver, fmt.Sprint(sqldb.PostgresFmt, os.Getenv("PgUser"), os.Getenv("PgPassword"), fmt.Sprintf("%s:%s", os.Getenv("PgHost"), os.Getenv("PgPort")), os.Getenv("PgDb")), sqldb.DefaultPostgresPoolSize)
+	ctx.db, err = dal.NewDAL(sqldb.PostgresDriver, fmt.Sprintf(sqldb.PostgresFmt, os.Getenv("PgUser"), os.Getenv("PgPassword"), fmt.Sprintf("%s:%s", os.Getenv("PgHost"), os.Getenv("PgPort")), os.Getenv("PgDb")), sqldb.DefaultPostgresPoolSize)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (ctx *WardenContext) initBridgeSettings() error {
 }
 
 func (ctx *WardenContext) initPulsarCli() error {
-	pulsarCli, err := middleware.CreatePulsarClient()
+	pulsarCli, err := middleware.CreatePulsarClient(os.Getenv("PulsarURL"))
 	if err != nil {
 		return err
 	}

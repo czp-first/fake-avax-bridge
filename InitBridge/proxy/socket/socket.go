@@ -12,7 +12,7 @@ func Req(in, out interface{}) {
 	log.Infof("%+v", in)
 	conn, err := net.Dial("tcp", os.Getenv("EnclaveURL"))
 	if err != nil {
-		log.Fatalf("conn server failed, err:%v\n", err)
+		log.Fatalf("conn server failed, err:%v", err)
 	}
 	defer conn.Close()
 
@@ -20,14 +20,14 @@ func Req(in, out interface{}) {
 
 	err = encode.Encode(&in)
 	if err != nil {
-		log.Fatalf("encode req error is :%v\n", err)
+		log.Fatalf("encode req error is :%v", err)
 	}
 
 	decode := json.NewDecoder(conn)
 	err = decode.Decode(&out)
 
 	if err != nil {
-		log.Fatalf("encode resp error is :%v\n", err)
+		log.Fatalf("encode resp error is :%v", err)
 	}
 	log.Infof("%+v", out)
 }

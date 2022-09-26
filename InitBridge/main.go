@@ -31,11 +31,11 @@ type StoreReq struct {
 }
 
 type StoreBody struct {
-	ShareVersion    int       `json:"share_version"`
-	Threshold       int       `json:"threshold"`
-	Wardens         []*Warden `json:"wardens"`
-	OnboardChainId  int       `json:"onboard_chain_id"`
-	OffboardChainId int       `json:"offboard_chain_id"`
+	ShareVersion int       `json:"share_version"`
+	Threshold    int       `json:"threshold"`
+	Wardens      []*Warden `json:"wardens"`
+	FromChainId  int       `json:"from_chain_id"`
+	ToChainId    int       `json:"to_chain_id"`
 }
 
 type StoreResp struct {
@@ -43,9 +43,9 @@ type StoreResp struct {
 }
 
 type StoreContent struct {
-	Shares                 []Share `json:"shares"`
-	OnboardAccountAddress  string  `json:"onboard_account_address"`
-	OffboardAccountAddress string  `json:"offboard_account_address"`
+	EncryptShares      []Share `json:"encrypt_shares"`
+	FromAccountAddress string  `json:"from_account_address"`
+	ToAccountAddress   string  `json:"to_account_address"`
 }
 
 type Share struct {
@@ -58,26 +58,29 @@ var (
 )
 
 func init() {
-	flag.StringVar(&envFile, "e", "dev.env", "env file")
+	flag.StringVar(&envFile, "e", "", "env file")
 }
 
 func main() {
 
+	var err error
 	flag.Parse()
-	log.Info("Initializing env...")
-	err := godotenv.Load(envFile)
-	if err != nil {
-		log.Fatalf("Fail initialize env: %v\n", err)
-		return
+	if envFile != "" {
+		log.Info("Initializing env...")
+		err = godotenv.Load(envFile)
+		if err != nil {
+			log.Fatalf("Fail initialize env: %v", err)
+			return
+		}
+		log.Info("Successfully initialize env")
 	}
-	log.Info("Successfully initialize env")
 
 	// Set up a connection to the server.
-	log.Infof(os.Getenv("WardensRPC"))
 	wardensRPC := make([]string, 0)
 	err = json.Unmarshal([]byte(os.Getenv("WardensRPC")), &wardensRPC)
 	if err != nil {
 		log.Fatalf("fail parse wardes rpc from env file")
+		return
 	}
 
 	wardens := make([]*Warden, 0)
@@ -118,32 +121,32 @@ func main() {
 		log.Fatalf("fail parse threshold from env file: %v", err)
 	}
 
-	onboardChainId, err := strconv.Atoi(os.Getenv("OnboardChainId"))
+	fromChainId, err := strconv.Atoi(os.Getenv("FromChainId"))
 	if err != nil {
-		log.Fatalf("fail parse onboard chain id from env file: %v", err)
+		log.Fatalf("fail parse from chain id from env file: %v", err)
 	}
 
-	offboardChainId, err := strconv.Atoi(os.Getenv("OffboardChainId"))
+	toChainId, err := strconv.Atoi(os.Getenv("ToChainId"))
 	if err != nil {
-		log.Fatalf("fail parse offboard chain id from env file: %v", err)
+		log.Fatalf("fail parse to chain id from env file: %v", err)
 	}
 	var resp StoreResp
 	req := StoreReq{
 		Method: "storeCredential",
 		Body: StoreBody{
 			// TODO: version
-			ShareVersion:    0,
-			Threshold:       threshold,
-			Wardens:         wardens,
-			OnboardChainId:  onboardChainId,
-			OffboardChainId: offboardChainId,
+			ShareVersion: 0,
+			Threshold:    threshold,
+			Wardens:      wardens,
+			FromChainId:  fromChainId,
+			ToChainId:    toChainId,
 		},
 	}
 	proxy.Req(&req, &resp)
 	log.Infof("%+v", resp)
 	log.Infof("successfully initialize enclave")
 
-	for _, share := range resp.Content.Shares {
+	for _, share := range resp.Content.EncryptShares {
 		identification := share.Identification
 		wardenRPC := identification2RPC[identification]
 		log.Infof("save warden share: %v", wardenRPC)
@@ -154,7 +157,7 @@ func main() {
 		defer conn.Close()
 
 		c := pb.NewWardenClient(conn)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_, err = c.SaveShare(ctx, &pb.SaveShareReq{Share: share.Share})
 		if err != nil {

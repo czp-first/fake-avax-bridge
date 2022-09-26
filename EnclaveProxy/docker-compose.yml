@@ -9,4 +9,4 @@ services:
     # ports:
     #   - 50055:50055
 
-# docker run -it --env-file dev.env  enclaveproxy_enclave-proxy bash
+# docker run -it --env-file dev.env  -p 50055:50055 enclaveproxy_enclave-proxy ./EnclaveProxy
