@@ -45,7 +45,7 @@ func (lc *LocalCredential) Encrypt(plaintext string) string {
 		log.Fatal(err)
 	}
 
-	url := fmt.Sprintf("%s/encrypt", os.Getenv("CryptoURL"))
+	url := fmt.Sprintf("%s/encrypt", os.Getenv("CloudServiceURL"))
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(json_data))
 	if err != nil {
@@ -76,7 +76,7 @@ func (lc *LocalCredential) Decrypt(ciphertext string) string {
 		log.Fatal(err)
 	}
 
-	url := fmt.Sprintf("%s/decrypt", os.Getenv("CryptoURL"))
+	url := fmt.Sprintf("%s/decrypt", os.Getenv("CloudServiceURL"))
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(json_data))
 	if err != nil {

@@ -116,7 +116,7 @@ func (ctx *WardenContext) seeFromChainBlock() error {
 
 	fromChainLatestBlockNum, err := ctx.FromChainClient.HttpClient.BlockNumber(context.Background())
 	if err != nil {
-		log.Errorf("onboard: Get eth blockNumber err: %v", err)
+		log.Errorf("onboard: Get from chain blockNumber err: %v", err)
 		return err
 	}
 	log.Infof(
@@ -138,7 +138,7 @@ func (ctx *WardenContext) seeFromChainBlock() error {
 		Type:  "int",
 	})
 
-	preFromChainLastIndexedBlk = 12714289 - 1 // weth
+	// preFromChainLastIndexedBlk = 12714289 - 1 // weth
 	// preFromChainLastIndexedBlk = 12731462 - 1 // dx
 	if (fromChainLatestBlockNum - preFromChainLastIndexedBlk) > fromChainMinConfirmations {
 		readyFromChainIndexBlk := preFromChainLastIndexedBlk + 1
@@ -175,8 +175,8 @@ func (ctx *WardenContext) SeeFromChainBlock() {
 	for range ticker.C {
 		err := ctx.seeFromChainBlock()
 		if err != nil {
+			log.Errorf("see from chain block err:%v", err)
 			break
 		}
-		break
 	}
 }

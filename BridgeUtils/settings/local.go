@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net/http"
@@ -40,7 +41,7 @@ func (lbs *LocalBridgeSettings) InitSettings() {
 		Timeout: time.Second * 2,
 	}
 
-	req, err := http.NewRequest(http.MethodGet, os.Getenv("BridgeSettingsFileURL"), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/static/%s", os.Getenv("CloudServiceURL"), os.Getenv("BridgeSettingsFilename")), nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,7 +130,7 @@ func (lbs *LocalBridgeSettings) ConsumeUpdate(body *middleware.SettingsJSON) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	request, err := http.NewRequest(http.MethodPut, os.Getenv("BridgeSettingsFileURL"), bytes.NewBuffer(s_bytes))
+	request, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/settings/%s", os.Getenv("CloudServiceURL"), os.Getenv("BridgeSettingsFilename")), bytes.NewBuffer(s_bytes))
 	if err != nil {
 		log.Fatal(err)
 	}

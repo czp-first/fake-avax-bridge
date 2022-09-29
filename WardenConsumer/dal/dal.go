@@ -64,7 +64,7 @@ func (d *DAL) GetEnclaveOnboardByHashBatch(blockHash, txnHash string, batch int6
 
 func (d *DAL) IsWardenOnboardExist(blockHash, txnHash string, batch int64) (bool, error) {
 	var isExist int64
-	q := `select 1 from warden_onboard where block_hash=$1 and txn_hash=$2 and batch=$3 and status<>$4`
+	q := `SELECT 1 FROM warden_onboard WHERE block_hash=$1 AND txn_hash=$2 AND batch=$3 AND status<>$4`
 	err := d.QueryRow(q, blockHash, txnHash, batch, sqldb.TIMEOUT).Scan(&isExist)
 
 	return sqldb.ChkQueryRow(err)
@@ -86,6 +86,14 @@ func (d *DAL) InsertInitWardenOnboard(blockHash, txnHash, contract, account stri
 
 	_, err := d.Exec(q, blockHash, txnHash, chainId.Uint64(), contract, account, amount.Uint64(), blockNumber, txnIndex, sqldb.INIT, batch)
 	return err
+}
+
+func (d *DAL) IsEnclaveOnboardExist(blockHash, txnHash string, batch int64) (bool, error) {
+	var isExist int64
+	q := `SELECT 1 FROM enclave_onboard WHERE block_hash=$1 AND txn_hash=$2 AND batch=$3`
+	err := d.QueryRow(q, blockHash, txnHash, batch).Scan(&isExist)
+
+	return sqldb.ChkQueryRow(err)
 }
 
 func (d *DAL) InsertNomalEnclaveOnboard(blockHash, txnHash, onboardTxnHash string, nonce uint64, batch int64) error {

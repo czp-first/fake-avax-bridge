@@ -6,7 +6,7 @@ import (
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/server"
+	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/core"
 )
 
 var (
@@ -30,6 +30,12 @@ func main() {
 		log.Info("Successfully initialize env")
 	}
 
-	server.NewServer()
+	ctx := core.NewEnclaveProxyContext()
+	err := ctx.Init()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	core.NewServer(ctx)
 
 }

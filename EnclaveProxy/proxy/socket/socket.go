@@ -2,7 +2,6 @@ package socket_cli
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"os"
 
@@ -11,7 +10,7 @@ import (
 
 func Req(in, out interface{}) {
 	log.Infof("request: %+v", in)
-	conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", os.Getenv("EnclavePort")))
+	conn, err := net.Dial("tcp", os.Getenv("EnclaveURL"))
 	if err != nil {
 		log.Fatalf("conn server failed, err:%v", err)
 	}

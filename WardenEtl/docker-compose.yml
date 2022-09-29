@@ -6,4 +6,4 @@ services:
       context: ../
       dockerfile: WardenEtl/Dockerfile
 
-# docker run -it --env-file warden1.env  wardenetl_warden-etl bash
+# docker run -it --env-file ../envs/warden1.env  wardenetl_warden-etl ./WardenEtl

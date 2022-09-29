@@ -160,13 +160,6 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 	if realAmount.Cmp(big.NewInt(0)) < 0 {
 		log.Fatal("onboard real amount less 0")
 	}
-	// identification, _ := ioutil.ReadFile(os.Getenv("IdentificationFilePath"))
-	client, err := ethclient.Dial(os.Getenv("DxChainHttps"))
-	if err != nil {
-		log.Fatalf("Oops! There was a problem %s", err)
-	} else {
-		log.Infoln("Success! You are connected to heco testnet")
-	}
 
 	currentGasPrices := s.bridgeSettings.GetCurrentGasPrices()
 	suggestedTip := currentGasPrices.Dxchain.SuggestedTip
@@ -175,7 +168,7 @@ func (s *WardenContext) GetWardenOnboard(ctx context.Context, in *pb.GetWardenOn
 	walletAddress := s.bridgeSettings.GetSettings().Critical.WalletAddress.Dxchain
 
 	// TODO: get from db
-	nonce, err := client.PendingNonceAt(context.Background(), walletAddress)
+	nonce, err := s.ToChainClient.HttpClient.PendingNonceAt(context.Background(), walletAddress)
 	if err != nil {
 		log.Fatalf("Fail get pending nonce: %v", err)
 	}
@@ -206,7 +199,7 @@ func (s *WardenContext) Onboard(ctx context.Context, in *pb.OnboardReq) (*pb.Emp
 
 	jsonSchema := pulsar.NewJSONSchema(middleware.OnboardTxnSchemaDef, nil)
 	producer, err := s.pulsarCli.CreateProducer(pulsar.ProducerOptions{
-		Topic:  os.Getenv("PulsarTopic"),
+		Topic:  os.Getenv("PulsarOnboardTopic"),
 		Schema: jsonSchema,
 	})
 	if err != nil {

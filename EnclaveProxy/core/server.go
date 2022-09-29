@@ -1,29 +1,22 @@
-package server
+package core
 
 import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"net"
 	"os"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rlp"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
+
+	"github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 
 	pb "github.com/czp-first/fake-avax-bridge/EnclaveProxy/enclavepb"
 	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/proxy"
 	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/wardencli"
-
-	"github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 )
-
-type server struct {
-	pb.UnimplementedEnclaveServer
-}
 
 type EnclaveTxn struct {
 	BlockHash string `json:"block_hash"`
@@ -42,30 +35,37 @@ type EnclaveOnboardTxnReq struct {
 }
 
 type EnclaveOnboardTxnContent struct {
-	Status  string   `json:"status"`
-	Wardens []string `json:"wardens"`
+	Status  string        `json:"status"`
+	Wardens []*WardenInfo `json:"wardens"`
+}
+
+type WardenInfo struct {
+	Identification string `json:"identification"`
+	Url            string `json:"url"`
 }
 
 type EnclaveOnboardTxnResp struct {
 	Content EnclaveOnboardTxnContent `json:"content"`
 }
 
-type EnclaveSignTxnReq struct {
-	Method string             `json:"method"`
-	Body   EnclaveSignTxnBody `json:"body"`
+type EnclaveSignOnboardTxnReq struct {
+	Method string                    `json:"method"`
+	Body   EnclaveSignOnboardTxnBody `json:"body"`
 }
 
-type EnclaveSignTxnBody struct {
-	IsEip1559    bool           `json:"is_eip1559"`
-	WardenShares []*WardenShare `json:"warden_shares"`
-	ChainId      uint64         `json:"chain_id"`
-	ContractAddr string         `json:"contract_addr"`
-	RealAmount   uint64         `json:"amount"`
-	GasPrice     uint64         `json:"gas_price"`
-	AccountAddr  string         `json:"account_addr"`
-	Nonce        uint64         `json:"nonce"`
-	OriginTxn    string         `json:"origin_txn"`
-	Fee          uint64         `json:"fee"`
+type EnclaveSignOnboardTxnBody struct {
+	IsEip1559       bool           `json:"is_eip1559"`
+	WardenShares    []*WardenShare `json:"warden_shares"`
+	ChainId         uint64         `json:"chain_id"`
+	ContractAddr    string         `json:"contract_addr"`
+	RealAmount      uint64         `json:"amount"`
+	GasPrice        uint64         `json:"gas_price"`
+	AccountAddr     string         `json:"account_addr"`
+	Nonce           uint64         `json:"nonce"`
+	OriginTxn       string         `json:"origin_txn"`
+	OriginBlockHash string         `json:"origin_block_hash"`
+	OriginBatch     int64          `json:"origin_batch"`
+	Fee             uint64         `json:"fee"`
 }
 
 type WardenShare struct {
@@ -78,10 +78,11 @@ type EnclaveSignTxnResp struct {
 }
 
 type EnclaveSignTxnContent struct {
-	Txn       string `json:"txn"`
-	Nonce     uint64 `json:"nonce"`
-	GasPrice  uint64 `json:"gas_price"`
-	IsEip1559 bool   `json:"is_eip1559"`
+	Txn       string   `json:"txn"`
+	Nonce     uint64   `json:"nonce"`
+	GasPrice  uint64   `json:"gas_price"`
+	IsEip1559 bool     `json:"is_eip1559"`
+	Urls      []string `json:"urls"`
 }
 
 type EnclaveOffboardTxnReq struct {
@@ -130,9 +131,9 @@ type EnclaveSignOffboardTxnContent struct {
 	IsEip1559 bool   `json:"is_eip1559"`
 }
 
-func (s *server) ReceiveOnboardTxn(ctx context.Context, in *pb.OnboardTxn) (*pb.Status, error) {
+func (s *EnclaveProxyContext) ReceiveOnboardTxn(ctx context.Context, in *pb.OnboardTxn) (*pb.Status, error) {
 
-	log.Infof("receive onboard txn from warden, blockHash[%v], txnHash[%v]\n", in.BlockHash, in.TxnHash)
+	log.Infof("receive onboard txn from warden, blockHash[%v], txnHash[%v]", in.BlockHash, in.TxnHash)
 	req := EnclaveOnboardTxnReq{
 		Method: "onboardTxn",
 		Body: EnclaveOnboardTxnBody{
@@ -147,7 +148,7 @@ func (s *server) ReceiveOnboardTxn(ctx context.Context, in *pb.OnboardTxn) (*pb.
 
 	var resp EnclaveOnboardTxnResp
 	proxy.Req(&req, &resp)
-	log.Infof("onboard txn status: %v\n", resp.Content.Status)
+	log.Infof("onboard txn status: %v", resp.Content.Status)
 
 	if resp.Content.Status != "ready" {
 		return &pb.Status{Status: resp.Content.Status}, nil
@@ -157,7 +158,7 @@ func (s *server) ReceiveOnboardTxn(ctx context.Context, in *pb.OnboardTxn) (*pb.
 	return &pb.Status{Status: resp.Content.Status}, nil
 }
 
-func (s *server) ReceiveOffboardTxn(ctx context.Context, in *pb.OffboardTxn) (*pb.Status, error) {
+func (s *EnclaveProxyContext) ReceiveOffboardTxn(ctx context.Context, in *pb.OffboardTxn) (*pb.Status, error) {
 
 	req := EnclaveOffboardTxnReq{
 		Method: "offboardTxn",
@@ -182,18 +183,18 @@ func (s *server) ReceiveOffboardTxn(ctx context.Context, in *pb.OffboardTxn) (*p
 	return &pb.Status{Status: resp.Content.Status}, nil
 }
 
-func readyOnboard(wardens []string, blockHash, txnHash string, batch int64) error {
+func readyOnboard(wardens []*WardenInfo, blockHash, txnHash string, batch int64) error {
 
 	log.Infof("ready onboard txn: %s", txnHash)
-	wardenConfFile, _ := os.OpenFile(os.Getenv("WardensConfPath"), os.O_RDONLY, 0644)
-	defer wardenConfFile.Close()
-	wardenMap := make(map[string]string)
-	decoder := json.NewDecoder(wardenConfFile)
+	// wardenConfFile, _ := os.OpenFile(os.Getenv("WardensConfPath"), os.O_RDONLY, 0644)
+	// defer wardenConfFile.Close()
+	// wardenMap := make(map[string]string)
+	// decoder := json.NewDecoder(wardenConfFile)
 
-	err := decoder.Decode(&wardenMap)
-	if err != nil {
-		return err
-	}
+	// err := decoder.Decode(&wardenMap)
+	// if err != nil {
+	// 	return err
+	// }
 
 	in := wardenpb.GetWardenOnboardReq{
 		BlockHash: blockHash,
@@ -205,9 +206,9 @@ func readyOnboard(wardens []string, blockHash, txnHash string, batch int64) erro
 	var isEip1559 bool
 	wardenShares := make([]*WardenShare, 0)
 
-	for index, identification := range wardens {
+	for index, warden := range wardens {
 
-		onboardTxnResp := wardencli.GetOnboardTxn(wardenMap[identification], &in)
+		onboardTxnResp := wardencli.GetOnboardTxn(warden.Url, &in)
 
 		// TODO: nonce 处理
 		if index == 0 {
@@ -251,25 +252,27 @@ func readyOnboard(wardens []string, blockHash, txnHash string, batch int64) erro
 		}
 
 		wardenShares = append(wardenShares, &WardenShare{
-			Identification: identification,
+			Identification: warden.Identification,
 			EncryptShare:   onboardTxnResp.Share,
 		})
 
 	}
 
-	req := EnclaveSignTxnReq{
+	req := EnclaveSignOnboardTxnReq{
 		Method: "signOnboardTxn",
-		Body: EnclaveSignTxnBody{
-			IsEip1559:    isEip1559,
-			WardenShares: wardenShares,
-			ChainId:      chainId,
-			ContractAddr: contract,
-			RealAmount:   realAmount,
-			GasPrice:     gasPrice,
-			AccountAddr:  account,
-			Nonce:        nonce,
-			OriginTxn:    txnHash,
-			Fee:          fee,
+		Body: EnclaveSignOnboardTxnBody{
+			IsEip1559:       isEip1559,
+			WardenShares:    wardenShares,
+			ChainId:         chainId,
+			ContractAddr:    contract,
+			RealAmount:      realAmount,
+			GasPrice:        gasPrice,
+			AccountAddr:     account,
+			Nonce:           nonce,
+			OriginTxn:       txnHash,
+			OriginBlockHash: blockHash,
+			OriginBatch:     batch,
+			Fee:             fee,
 		},
 	}
 
@@ -288,7 +291,7 @@ func readyOnboard(wardens []string, blockHash, txnHash string, batch int64) erro
 		log.Fatal(err)
 	}
 
-	client, err := ethclient.Dial(os.Getenv("DxChainHttps"))
+	client, err := ethclient.Dial(os.Getenv("ToChainHttps"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -298,8 +301,8 @@ func readyOnboard(wardens []string, blockHash, txnHash string, batch int64) erro
 	}
 	log.Infof("onboard txn hash: %v", txn.Hash().String())
 
-	for _, addr := range wardenMap {
-		wardencli.Onboard(addr, &wardenpb.OnboardReq{
+	for _, url := range resp.Content.Urls {
+		wardencli.Onboard(url, &wardenpb.OnboardReq{
 			BlockHash:      blockHash,
 			TxnHash:        txnHash,
 			OnboardTxnHash: txn.Hash().String(),
@@ -418,18 +421,4 @@ func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) err
 	}
 
 	return nil
-}
-
-func NewServer() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", os.Getenv("RPCPort")))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
-
-	pb.RegisterEnclaveServer(s, &server{})
-	log.Infof("server listening at %v", lis.Addr())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
 }

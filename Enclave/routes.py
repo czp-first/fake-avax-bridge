@@ -21,23 +21,21 @@ class EnclaveTxnStatus(str, Enum):
 
 
 def store_credential(share_version: int, threshold: int, wardens: list, from_chain_id: int, to_chain_id: int, db_conn):
-
     wardens_info = []
     crypto_way = set()
     configs = []
     for warden in wardens:
         crypto_way.add(warden["type"])
-        wardens_info.append((warden["identification"], warden["credential"]))
+        wardens_info.append((warden["identification"], warden["credential"], warden["url"]))
     if len(crypto_way) != 1:
         raise ValueError(f"crypto way is not a consensus: {crypto_way}")
 
     configs.append(("crypto_way", list(crypto_way)[0]))
     configs.append(("share_version", share_version))
     configs.append(("threshold", threshold))
-    cursor = db_conn.cursor()
-    cursor.executemany("INSERT INTO config(key, value)VALUES(?, ?)", configs)
-    cursor.executemany("INSERT INTO warden(identification, credential)VALUES(?, ?)", wardens_info)
-    cursor.close()
+    db_conn.executemany("INSERT INTO config(key, value)VALUES(?, ?)", configs)
+    db_conn.executemany("INSERT INTO warden(identification, credential, url)VALUES(?, ?, ?)", wardens_info)
+    db_conn.commit()
 
     wallet_info = wallet.init_wallet(len(wardens), threshold, from_chain_id, to_chain_id)
     logger.info("wallet info: {}", wallet_info)
@@ -68,55 +66,85 @@ def store_credential(share_version: int, threshold: int, wardens: list, from_cha
 
 
 def process_onboard_txn(txn, identification, db_conn):
-
     cursor = db_conn.cursor()
     cursor.execute(
         """
-            select status, wardens from enclave_onboard_txn
-            where block_hash=%s and transaction_hash=%s and batch=%s
+            SELECT status, wardens
+            FROM enclave_onboard_txn
+            WHERE block_hash=? AND transaction_hash=? AND batch=?
         """,
         (txn["block_hash"], txn["txn_hash"], txn["batch"])
     )
-    row = cursor.fetone()
+    row = cursor.fetchone()
     if not row:
+        logger.info("onboard: new onboard transaction")
         cursor.execute(
             """
-                insert into enclave_onboard_txn(block_hash, transaction_hash, batch, wardens, status)
-                    values(%s, %s, %s, %s)
+                INSERT INTO enclave_onboard_txn(block_hash, transaction_hash, batch, wardens, status)
+                    VALUES(?, ?, ?, ?, ?)
             """,
             (txn["block_hash"], txn["txn_hash"], txn["batch"], identification, EnclaveTxnStatus.Wait.value)
         )
+        db_conn.commit()
         return dict(status=EnclaveTxnStatus.Wait.value)
     else:
         wardens = row[1].split(",")
         if identification in wardens:
+            logger.info("onboard: duplicate")
             return dict(status=row[0])
 
         if row[0] != EnclaveTxnStatus.Wait.value:
+            logger.info("onboard: status %s", row[0])
             return dict(status=row[0])
 
         cursor.execute("SELECT value FROM config WHERE key=?", ("threshold",))
         threshold = int(cursor.fetchone()[0])
-        if len(wardens) >= threshold-1:
-            wardens.append(identification)
+        logger.info("onboard: current wardens %s", wardens)
+        wardens.append(identification)
+        if len(wardens) >= threshold:
+            logger.info("onboard: ready")
             cursor.execute(
                 """
-                    update enclave_onboard
-                    set wardens=%s and status=%s
-                    where block_hash=%s and transaction_hash=%s and batch=%s
+                    UPDATE enclave_onboard_txn
+                    SET wardens=?, status=?
+                    WHERE block_hash=? AND transaction_hash=? AND batch=?
                 """,
-                (",".join(wardens), EnclaveTxnStatus.Pending.value, txn["block_hash"], txn["transaction_hash"], txn["batch"])
+                (",".join(wardens), EnclaveTxnStatus.Pending.value, txn["block_hash"], txn["txn_hash"], txn["batch"])
             )
-            return dict(status=EnclaveTxnStatus.Ready.value, wardens=wardens[:threshold])
+            cursor.execute(
+                """
+                    SELECT identification, url
+                    FROM warden
+                    WHERE identification IN ({seq})
+                    ORDER BY id
+                """.format(seq=",".join(["?"]*threshold)),
+                wardens[:threshold],
+            )
+            wardens_info = [
+                dict(
+                    identification=i[0],
+                    url=i[1],
+                )
+                for i in cursor.fetchall()
+            ]
+            cursor.close()
+            db_conn.commit()
+            return dict(
+                status=EnclaveTxnStatus.Ready.value,
+                wardens=wardens_info,
+            )
         else:
+            logger.info("onboard: go on waiting")
             cursor.execute(
                 """
-                    update enclave_onboard
-                    set wardens=%s
-                    where block_hash=%s and transaction_hash=%s and batch=%s
+                    UPDATE enclave_onboard_txn
+                    SET wardens=?
+                    WHERE block_hash=? AND transaction_hash=? AND batch=?
                 """,
-                (",".join(wardens), txn["block_hash"], txn["transaction_hash"], txn["batch"])
+                (",".join(wardens), txn["block_hash"], txn["txn_hash"], txn["batch"])
             )
+            cursor.close()
+            db_conn.commit()
             return dict(status=EnclaveTxnStatus.Wait.value)
 
 
@@ -145,10 +173,10 @@ def process_offboard_txn(txn, identification):
     return {'status': 'wait'}
 
 
-def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, origin_txn, fee):
+def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, fee, origin_txn, origin_block_hash, origin_batch, db_conn):
     decrypt_shares = []
     for warden_share in warden_shares:
-        decrypt_share = get_crypto_obj(warden_share["identification"]).decrypt(warden_share["encrypt_share"])
+        decrypt_share = get_crypto_obj(warden_share["identification"], db_conn).decrypt(warden_share["encrypt_share"])
         decrypt_shares.append(decrypt_share)
     mnemonic = wallet.recover_wallet(tuple(decrypt_shares))
 
@@ -165,17 +193,25 @@ def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount,
         fee=fee,
     )
 
-    # TODO(Rey): update enclave_onboard_txn.status after sign, lack block_hash and batch
-    # conn = sqlite3.connect("db/enclave.db")
-    # with conn.cursor() as cursor:
-    #     cursor.execute(
-    #         """
-    #             update enclave_onboard_txn
-    #             set status=%s
-    #             where block_hash=%s and transaction_hash=%s and batch=%s
-    #         """,
-    #         ()
-    #     )
+    cursor = db_conn.cursor()
+    cursor.execute(
+        """
+            UPDATE enclave_onboard_txn
+            SET status=?
+            WHERE block_hash=? AND transaction_hash=? AND batch=?
+        """,
+        (EnclaveTxnStatus.Ago.value, origin_block_hash, origin_txn, origin_batch)
+    )
+    cursor.execute(
+        """
+            SELECT url
+            FROM warden
+            ORDER BY id
+        """,
+    )
+    urls = [i[0] for i in cursor.fetchall()]
+    cursor.close()
+    db_conn.commit()
 
     return {
         # web3 需要0x开头, go-ethereum不需要
@@ -183,9 +219,11 @@ def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount,
         'nonce': nonce,
         'gas_price': gas_price,
         "is_eip1559": is_eip1559,
+        "urls": urls,
     }
 
 
+# TODO(Rey): 
 def sign_offboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce):
     decrypt_shares = []
     for warden_share in warden_shares:

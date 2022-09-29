@@ -1,0 +1,9 @@
+version: "2"
+
+services:
+  warden-producer:
+    build:
+      context: ../
+      dockerfile: WardenProducer/Dockerfile
+
+# docker run -it --env-file ../envs/warden1.env wardenproducer_warden-producer ./WardenProducer

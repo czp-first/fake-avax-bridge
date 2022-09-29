@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 """
-@Summary : docstr
+@Summary : 测试存储warden信息
 @Author  : Rey
 @Time    : 2022-07-12 22:24:00
 @Run     : python -m unittest tests/routes/test_store_credential.py
@@ -20,7 +20,7 @@ from shamir import combine
 
 
 class TestStoreInfo(unittest.TestCase):
-
+    """test routes.store_credential"""
     def setUp(self) -> None:
         self.conn = sqlite3.connect(":memory:")
         cursor = self.conn.cursor()
@@ -33,10 +33,11 @@ class TestStoreInfo(unittest.TestCase):
         wardens = [
             {
                 "identification": str(uuid4()),
-                "credential": dict(key=Fernet.generate_key().decode("utf-8")),
+                "credential": json.dumps(dict(key=Fernet.generate_key().decode("utf-8"))),
                 "type": crypto_way,
+                "url": f"url{i}"
             }
-            for _ in range(3)
+            for i in range(3)
         ]
         share_version = 0
         wardens_resp = store_credential(
@@ -51,7 +52,7 @@ class TestStoreInfo(unittest.TestCase):
         cursor = self.conn.cursor()
         for warden in wardens:
             cursor.execute("SELECT credential FROM warden WHERE identification=?", (warden["identification"],))
-            self.assertDictEqual(warden["credential"], json.loads(cursor.fetchone()[0]))
+            self.assertDictEqual(json.loads(warden["credential"]), json.loads(cursor.fetchone()[0]))
 
         query_config_sql = "SELECT value FROM config WHERE key=?"
         cursor.execute(query_config_sql, ("crypto_way",))

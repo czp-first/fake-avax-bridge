@@ -47,10 +47,23 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 		switch onboardTxn.Type {
 		// receive onboard txn from enclave
 		case middleware.Enclave:
+			isExist, err := ctx.db.IsEnclaveOnboardExist(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
+			if err != nil {
+				log.Errorf("DB error: %v", err)
+				consumer.Nack(msg)
+				continue
+			}
+			if isExist {
+				log.Infoln("this onboard txn from enclave already exists in enclave")
+				consumer.Ack(msg)
+				continue
+			}
 			err = ctx.db.InsertNomalEnclaveOnboard(
 				onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.OnboardTxnHash, onboardTxn.Nonce, onboardTxn.Batch)
 			if err != nil {
-				log.Fatalf("DB error:%v", err)
+				log.Errorf("DB error:%v", err)
+				consumer.Nack(msg)
+				continue
 			}
 			// if err != nil {
 			// 	handlerTx.Rollback()
@@ -67,7 +80,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 		case middleware.Warden:
 			isExist, err := ctx.db.IsWardenOnboardExist(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
 			if err != nil {
-				log.Fatalf("DB error: %v", err)
+				log.Errorf("DB error: %v", err)
+				consumer.Nack(msg)
+				continue
 			}
 			if isExist {
 				log.Infoln("this onboard txn from warden already exists in warden")
@@ -77,7 +92,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 
 			enclaveOnboard, found, err := ctx.db.GetEnclaveOnboardByHashBatch(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
 			if err != nil {
-				log.Fatalf("DB error: %v", err)
+				log.Errorf("DB error: %v", err)
+				consumer.Nack(msg)
+				continue
 			}
 
 			if found {
@@ -87,7 +104,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 					onboardTxn.TxnIndex, onboardTxn.ChainId, onboardTxn.Amount)
 				if err != nil {
 					// handlerTx.Rollback()
-					log.Fatalf("DB error: %v", err)
+					log.Errorf("DB error: %v", err)
+					consumer.Nack(msg)
+					continue
 				}
 				// err = handlerTx.Commit()
 				// if err != nil {
@@ -104,7 +123,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 
 			if err != nil {
 				// handlerTx.Rollback()
-				log.Fatal("DB error: %v", err)
+				log.Errorf("DB error: %v", err)
+				consumer.Nack(msg)
+				continue
 			}
 			// err = handlerTx.Commit()
 			// if err != nil {
@@ -118,7 +139,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 		case middleware.WardenTimeout:
 			isExists, err := ctx.db.IsWardenOnboardExist(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
 			if err != nil {
-				log.Fatalf("DB error: %v", err)
+				log.Errorf("DB error: %v", err)
+				consumer.Nack(msg)
+				continue
 			}
 			if isExists {
 				log.Infoln("txn already exists")
@@ -128,7 +151,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 
 			enclaveOnboard, found, err := ctx.db.GetEnclaveOnboardByHashBatch(onboardTxn.BlockHash, onboardTxn.TxnHash, onboardTxn.Batch)
 			if err != nil {
-				log.Fatalf("DB error: %v", err)
+				log.Errorf("DB error: %v", err)
+				consumer.Nack(msg)
+				continue
 			}
 			if found {
 				err = ctx.db.InsertPendingWardenOnboard(
@@ -137,7 +162,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 					onboardTxn.ChainId, onboardTxn.Amount)
 				if err != nil {
 					// handlerTx.Rollback()
-					log.Fatalf("DB error: %v", err)
+					log.Errorf("DB error: %v", err)
+					consumer.Nack(msg)
+					continue
 				}
 
 				// err = handlerTx.Commit()
@@ -154,7 +181,9 @@ func (ctx *ConsumerContext) ConsumeOnboardTxn() {
 				onboardTxn.ChainId, onboardTxn.Amount, onboardTxn.BlockNumber, onboardTxn.Batch, onboardTxn.TxnIndex)
 			if err != nil {
 				// handlerTx.Rollback()
-				log.Fatalf("DB error: %v", err)
+				log.Errorf("DB error: %v", err)
+				consumer.Nack(msg)
+				continue
 			}
 
 			// err = handlerTx.Commit()

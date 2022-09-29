@@ -13,7 +13,8 @@ create table enclave_onboard_txn(
 create table warden(
     id integer primary key,
     identification varchar(64) unique not null,
-    credential text not null
+    credential text not null,
+    url varchar(64) not null
 );
 
 create table config(

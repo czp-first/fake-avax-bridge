@@ -147,7 +147,7 @@ func (ctx *WardenContext) initPulsarCli() error {
 
 func (ctx *WardenContext) initEnclaveClient() error {
 	var err error
-	ctx.Enclave, err = enclavecli.NewEnclaveAPI(os.Getenv("EnclaveRPC"))
+	ctx.Enclave, err = enclavecli.NewEnclaveAPI(os.Getenv("EnclaveProxyRPC"))
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (ctx *WardenContext) initCredential() error {
 }
 
 func NewServer(ctx *WardenContext) {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", os.Getenv("Port")))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", os.Getenv("WardenRPCPort")))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}

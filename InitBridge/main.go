@@ -23,6 +23,7 @@ type Warden struct {
 	Identification string `json:"identification"`
 	Type           string `json:"type"`
 	Credential     string `json:"credential"`
+	Url            string `json:"url"`
 }
 
 type StoreReq struct {
@@ -111,6 +112,7 @@ func main() {
 			Identification: identification,
 			Type:           r.GetType(),
 			Credential:     r.GetCredential(),
+			Url:            wardenRPC,
 		})
 		log.Infof("successfully initializing warden: %s", wardenRPC)
 	}
@@ -159,7 +161,11 @@ func main() {
 		c := pb.NewWardenClient(conn)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err = c.SaveShare(ctx, &pb.SaveShareReq{Share: share.Share})
+		_, err = c.SaveShare(ctx, &pb.SaveShareReq{
+			Share:                  share.Share,
+			OnboardAccountAddress:  resp.Content.FromAccountAddress,
+			OffboardAccountAddress: resp.Content.ToAccountAddress,
+		})
 		if err != nil {
 			log.Fatal(err)
 		}
