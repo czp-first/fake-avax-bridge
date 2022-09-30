@@ -16,10 +16,17 @@ type LocalCredentialFactory struct {
 }
 
 func (lcf *LocalCredentialFactory) MakeCredential() CredentialInterface {
-	key, err := ioutil.ReadFile(os.Getenv("CredentialFilePath"))
+	filePath := os.Getenv("CredentialFilePath")
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		key := GenerateKey()
+		ioutil.WriteFile(os.Getenv("CredentialFilePath"), []byte(key), 0644)
+	}
+	key, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return &LocalCredential{Key: string(key)}
 }
 
@@ -35,6 +42,10 @@ func GenerateKey() string {
 
 type EncryptResponse struct {
 	Ciphertext string `json:"ciphertext"`
+}
+
+func (lc *LocalCredential) GetKey() string {
+	return lc.Key
 }
 
 func (lc *LocalCredential) Encrypt(plaintext string) string {

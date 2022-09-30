@@ -105,3 +105,7 @@ func (kc *KmsCredential) Encrypt(plaintext string) string {
 
 	return base64.StdEncoding.EncodeToString(result.CiphertextBlob)
 }
+
+func (kc *KmsCredential) GetKey() string {
+	return ""
+}

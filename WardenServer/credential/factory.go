@@ -10,6 +10,7 @@ type CredentialFactory interface {
 }
 
 type CredentialInterface interface {
+	GetKey() string
 	Encrypt(plaintext string) string
 	Decrypt(ciphertext string) string
 }
