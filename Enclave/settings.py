@@ -10,9 +10,7 @@ from pydantic import BaseSettings
 
 class EnclaveSettings(BaseSettings):
 
-    work_dir: str
     shamir_path: str
-    warden_path: str
     fee_address: str
 
     default_gas: int

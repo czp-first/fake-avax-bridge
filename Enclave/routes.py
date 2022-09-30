@@ -94,12 +94,12 @@ def process_onboard_txn(txn, identification, db_conn):
             return dict(status=row[0])
 
         if row[0] != EnclaveTxnStatus.Wait.value:
-            logger.info("onboard: status %s", row[0])
+            logger.info("onboard: status {}", row[0])
             return dict(status=row[0])
 
         cursor.execute("SELECT value FROM config WHERE key=?", ("threshold",))
         threshold = int(cursor.fetchone()[0])
-        logger.info("onboard: current wardens %s", wardens)
+        logger.info("onboard: current wardens {}", wardens)
         wardens.append(identification)
         if len(wardens) >= threshold:
             logger.info("onboard: ready")
