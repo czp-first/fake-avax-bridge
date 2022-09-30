@@ -5,8 +5,4 @@ services:
     build:
       context: ../
       dockerfile: ./Enclave/Dockerfile
-    command: python server.py
-    ports:
-      - 8000:8000
 
-# docker-compose up --build

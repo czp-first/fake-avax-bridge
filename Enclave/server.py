@@ -19,7 +19,7 @@ ENCLAVE_PORT = 8000
 ip = '0.0.0.0'
 
 
-def main():
+def server():
     sk = socket.socket()
     sk.bind((ip, ENCLAVE_PORT))
     logger.debug('start: {}:{}', ip, ENCLAVE_PORT)
@@ -58,4 +58,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    server()

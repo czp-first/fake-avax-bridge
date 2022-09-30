@@ -51,7 +51,7 @@ func (c *EnclaveClient) ReceiveOnboardTxn(txn *pb.OnboardTxn) *pb.Status {
 
 	r, err := client.ReceiveOnboardTxn(ctx, txn)
 	if err != nil {
-		log.Fatalf("Fail request enclave rpc ReceiveOnboardTxn: %s\n", err)
+		log.Fatalf("Fail request enclave rpc ReceiveOnboardTxn: %s", err)
 	}
 	log.Infof("Request enclave rpc ReceiveOnboardTxn resp: %v", r)
 	return r
@@ -65,7 +65,7 @@ func (c *EnclaveClient) ReceiveOffboardTxn(txn *pb.OffboardTxn) *pb.Status {
 
 	r, err := client.ReceiveOffboardTxn(ctx, txn)
 	if err != nil {
-		log.Fatalf("Fail request enclave rpc ReceiveOffboardTxn: %s\n", err)
+		log.Fatalf("Fail request enclave rpc ReceiveOffboardTxn: %s", err)
 	}
 	log.Infof("Request enclave rpc ReceiveOffboardTxn resp: %v", r)
 	return r

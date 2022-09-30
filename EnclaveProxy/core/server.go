@@ -186,16 +186,6 @@ func (s *EnclaveProxyContext) ReceiveOffboardTxn(ctx context.Context, in *pb.Off
 func readyOnboard(wardens []*WardenInfo, blockHash, txnHash string, batch int64) error {
 
 	log.Infof("ready onboard txn: %s", txnHash)
-	// wardenConfFile, _ := os.OpenFile(os.Getenv("WardensConfPath"), os.O_RDONLY, 0644)
-	// defer wardenConfFile.Close()
-	// wardenMap := make(map[string]string)
-	// decoder := json.NewDecoder(wardenConfFile)
-
-	// err := decoder.Decode(&wardenMap)
-	// if err != nil {
-	// 	return err
-	// }
-
 	in := wardenpb.GetWardenOnboardReq{
 		BlockHash: blockHash,
 		TxnHash:   txnHash,

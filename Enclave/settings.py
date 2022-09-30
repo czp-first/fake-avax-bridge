@@ -1,9 +1,11 @@
-import os
+# -*- coding: UTF-8 -*-
+"""
+@Summary : docstr
+@Author  : Rey
+@Time    : 2022-09-30 11:11:54
+"""
 
 from pydantic import BaseSettings
-
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class EnclaveSettings(BaseSettings):
@@ -12,7 +14,6 @@ class EnclaveSettings(BaseSettings):
     shamir_path: str
     warden_path: str
     fee_address: str
-    # crypto_way: str
 
     default_gas: int
     max_fee_per_gas: int
@@ -29,4 +30,3 @@ enclave_settings = EnclaveSettings()
 
 if __name__ == '__main__':
     print(enclave_settings)
-

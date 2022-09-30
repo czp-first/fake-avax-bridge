@@ -3,8 +3,8 @@ version: "2"
 services:
   fake-cloud-service-api:
     build:
-      context: .
-      dockerfile: Dockerfile
-    command: uvicorn main:app --host 0.0.0.0 --port 80 --workers 3
-    ports:
-      - 5001:80
+      context: ../
+      dockerfile: ./FakeCloudService/Dockerfile
+    # command: uvicorn main:app --host 0.0.0.0 --port 80 --workers 3
+    # ports:
+    #   - "5001:80"

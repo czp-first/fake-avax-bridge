@@ -1,5 +1,5 @@
 create sequence warden_onboard_id_seq;
-CREATE TABLE warden_onboard (
+CREATE TABLE if not EXISTS warden_onboard (
     id bigint not null default nextval('warden_onboard_id_seq') PRIMARY KEY,
     created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -25,7 +25,7 @@ alter sequence warden_onboard_id_seq owned by warden_onboard.id;
 
 
 create sequence enclave_onboard_id_seq;
-CREATE TABLE enclave_onboard (
+CREATE TABLE if not EXISTS enclave_onboard (
     id bigint not null default nextval('enclave_onboard_id_seq') PRIMARY KEY,
     created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -43,7 +43,7 @@ alter sequence enclave_onboard_id_seq owned by enclave_onboard.id;
 
 
 create sequence warden_offboard_id_seq;
-CREATE TABLE warden_offboard (
+CREATE TABLE if not EXISTS warden_offboard (
     id bigint not null default nextval('warden_offboard_id_seq') PRIMARY KEY,
     created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -69,7 +69,7 @@ alter sequence warden_offboard_id_seq owned by warden_offboard.id;
 
 
 create sequence enclave_offboard_id_seq;
-CREATE TABLE enclave_offboard (
+CREATE TABLE if not EXISTS enclave_offboard (
     id bigint not null DEFAULT nextval('enclave_offboard_id_seq') PRIMARY KEY,
     created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,

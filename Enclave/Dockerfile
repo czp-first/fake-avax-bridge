@@ -24,5 +24,3 @@ RUN pip install --upgrade pip && pip install -r /$PROJECT_DIR/requirements.txt -
 COPY ./Enclave/ .
 COPY --from=builder /build/shamirbin .
 WORKDIR /$PROJECT_DIR
-
-RUN python init_db.py

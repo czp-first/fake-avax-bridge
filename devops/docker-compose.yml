@@ -1,0 +1,51 @@
+version: "2"
+
+services:
+  fake-cloud-service-api:
+    build:
+      context: ../
+      dockerfile: ./FakeCloudService/Dockerfile
+    # docker run -it -p 5001:80 devops_fake-cloud-service-api  uvicorn main:app --host 0.0.0.0 --port 80 --workers 3
+  enclave:
+    build:
+      context: ../
+      dockerfile: ./Enclave/Dockerfile
+    # docker run -it --env-file enclave.env -p 8000:8000 devops_enclave python main.py
+  enclave-proxy:
+    build:
+      context: ../
+      dockerfile: ./EnclaveProxy/Dockerfile
+    # docker run -it --env-file enclave-proxy.env  -p 50055:50055 devops_enclave-proxy ./EnclaveProxy
+  warden-server:
+    build:
+      context: ../
+      dockerfile: ./WardenServer/Dockerfile
+    # docker run -it --env-file warden1.env -p 50051:50051  devops_warden-server ./WardenServer
+    # docker run -it --env-file warden2.env -p 50052:50052  devops_warden-server ./WardenServer
+    # docker run -it --env-file warden3.env -p 50053:50053  devops_warden-server ./WardenServer
+  warden-consumer:
+    build:
+      context: ../
+      dockerfile: ./WardenConsumer/Dockerfile
+    # docker run -it --env-file warden1.env devops_warden-consumer ./WardenConsumer
+    # docker run -it --env-file warden2.env devops_warden-consumer ./WardenConsumer
+    # docker run -it --env-file warden3.env devops_warden-consumer ./WardenConsumer
+  warden-producer:
+    build:
+      context: ../
+      dockerfile: ./WardenProducer/Dockerfile
+    # docker run -it --env-file warden1.env devops_warden-producer ./WardenProducer
+    # docker run -it --env-file warden2.env devops_warden-producer ./WardenProducer
+    # docker run -it --env-file warden3.env devops_warden-producer ./WardenProducer
+  init-bridge:
+    build:
+      context: ../
+      dockerfile: ./InitBridge/Dockerfile
+    # docker run -it --env-file init-bridge.env devops_init-bridge ./InitBridge
+  warden-etl:
+    build:
+      context: ../
+      dockerfile: WardenEtl/Dockerfile
+    # docker run -it --env-file warden1.env  devops_warden-etl ./WardenEtl
+    # docker run -it --env-file warden2.env  devops_warden-etl ./WardenEtl
+    # docker run -it --env-file warden3.env  devops_warden-etl ./WardenEtl

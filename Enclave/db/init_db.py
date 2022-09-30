@@ -10,7 +10,7 @@ import sqlite3
 from settings import enclave_settings
 
 
-if __name__ == '__main__':
+def init_db():
     conn = sqlite3.connect(enclave_settings.db_path)
     cursor = conn.cursor()
 
@@ -19,3 +19,7 @@ if __name__ == '__main__':
 
     cursor.close()
     conn.close()
+
+
+if __name__ == '__main__':
+    init_db()
