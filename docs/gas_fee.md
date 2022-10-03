@@ -1,4 +1,4 @@
-![image-20220716145326640](/Users/rey/Library/Application Support/typora-user-images/image-20220716145326640.png)
+![gas-fee](https://github.com/czp-first/fake-avax-bridge/blob/master/docs/imgs/gas-fee.png)
 
 
 
