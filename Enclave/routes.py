@@ -205,12 +205,34 @@ def process_offboard_txn(txn, identification, db_conn: sqlite3.Connection):
     return ProcessTxn(False, txn, identification, db_conn).run()
 
 
-def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, fee, origin_txn, origin_block_hash, origin_batch, db_conn):
+def get_mnemonic(warden_shares, db_conn):
     decrypt_shares = []
     for warden_share in warden_shares:
         decrypt_share = get_crypto_obj(warden_share["identification"], db_conn).decrypt(warden_share["encrypt_share"])
         decrypt_shares.append(decrypt_share)
-    mnemonic = wallet.recover_wallet(tuple(decrypt_shares))
+    return wallet.recover_wallet(tuple(decrypt_shares))
+
+
+def set_enclave_txn_ago(is_onboard, db_conn, block_hash, txn_hash, batch):
+    table = "enclave_onboard_txn" if is_onboard else "enclave_offboard_txn"
+    cursor = db_conn.cursor()
+    cursor.execute(
+        """
+            UPDATE {table}
+            SET status=?
+            WHERE block_hash=? AND transaction_hash=? AND batch=?
+        """.format(table=table),
+        (EnclaveTxnStatus.Ago.value, block_hash, txn_hash, batch)
+    )
+    cursor.execute("SELECT url FROM warden ORDER BY id")
+    urls = [i[0] for i in cursor.fetchall()]
+    cursor.close()
+    return urls
+
+
+def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, fee, origin_txn, origin_block_hash, origin_batch, db_conn):
+    """签名上桥交易对应的跨链交易"""
+    mnemonic = get_mnemonic(warden_shares, db_conn)
 
     params = dict(
         is_eip1559=is_eip1559,
@@ -225,24 +247,7 @@ def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount,
         fee=fee,
     )
 
-    cursor = db_conn.cursor()
-    cursor.execute(
-        """
-            UPDATE enclave_onboard_txn
-            SET status=?
-            WHERE block_hash=? AND transaction_hash=? AND batch=?
-        """,
-        (EnclaveTxnStatus.Ago.value, origin_block_hash, origin_txn, origin_batch)
-    )
-    cursor.execute(
-        """
-            SELECT url
-            FROM warden
-            ORDER BY id
-        """,
-    )
-    urls = [i[0] for i in cursor.fetchall()]
-    cursor.close()
+    urls = set_enclave_txn_ago(True, db_conn, origin_block_hash, origin_txn, origin_batch)
     db_conn.commit()
 
     return {
@@ -255,13 +260,9 @@ def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount,
     }
 
 
-# TODO(Rey): 
-def sign_offboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce):
-    decrypt_shares = []
-    for warden_share in warden_shares:
-        decrypt_share = get_crypto_obj(warden_share["identification"]).decrypt(warden_share["encrypt_share"])
-        decrypt_shares.append(decrypt_share)
-    mnemonic = wallet.recover_wallet(tuple(decrypt_shares))
+def sign_offboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, origin_block_hash, origin_txn, origin_batch, db_conn):
+    """签名下桥交易对应的跨链交易"""
+    mnemonic = get_mnemonic(warden_shares, db_conn)
 
     params = dict(
         is_eip1559=is_eip1559,
@@ -274,11 +275,15 @@ def sign_offboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount
         nonce=nonce
     )
 
+    urls = set_enclave_txn_ago(False, db_conn, origin_block_hash, origin_txn, origin_batch)
+    db_conn.commit()
+
     return {
         'txn': wallet.sign_offboard_transaction(**params)[2:],
         'nonce': nonce,
         'gas_price': gas_price,
         "is_eip1559": is_eip1559,
+        "urls": urls,
     }
 
 

@@ -1,9 +1,9 @@
 # -*- coding: UTF-8 -*-
 """
-@Summary : 测试签名上桥交易
+@Summary : 测试签名下桥交易
 @Author  : Rey
-@Time    : 2022-09-29 16:38:41
-@Run     : python -m unittest tests/routes/test_sign_onboard_txn.py
+@Time    : 2022-10-04 17:46:29
+@Run     : python -m unittest tests/routes/test_sign_offboard_txn.py
 """
 
 import json
@@ -17,13 +17,13 @@ from web3 import Web3
 from crypto.adapter import get_crypto_obj
 from routes import (
     EnclaveTxnStatus,
-    sign_onboard_txn,
+    sign_offboard_txn,
 )
 from wallet import init_wallet
 
 
-class TestSignOnboardTxn(unittest.TestCase):
-    """test routes.sign_onboard_txn"""
+class TestSignOffboardTxn(unittest.TestCase):
+    """test routes.sign_offboard_txn"""
     def setUp(self) -> None:
         self.conn = sqlite3.connect(":memory:")
         cursor = self.conn.cursor()
@@ -70,7 +70,7 @@ class TestSignOnboardTxn(unittest.TestCase):
         cursor = self.conn.cursor()
         cursor.execute(
             """
-                INSERT INTO enclave_onboard_txn(block_hash, transaction_hash, batch, wardens, status)
+                INSERT INTO enclave_offboard_txn(block_hash, transaction_hash, batch, wardens, status)
                     VALUES(?, ?, ?, ?, ?)
             """,
             (txn["block_hash"], txn["txn_hash"], txn["batch"], identification, EnclaveTxnStatus.Wait.value),
@@ -81,7 +81,7 @@ class TestSignOnboardTxn(unittest.TestCase):
         ]
         nonce = 100
         gas_price = Web3.toWei(8, "gwei")
-        resp = sign_onboard_txn(
+        resp = sign_offboard_txn(
             is_eip1559=True,
             warden_shares=wardens_shares,
             chain_id=256,
@@ -90,7 +90,6 @@ class TestSignOnboardTxn(unittest.TestCase):
             gas_price=gas_price,
             account_addr="0x44fe5BD0e041aB1E42579812dA1D36234577Cf74",
             nonce=nonce,
-            fee=Web3.toWei(6, "gwei"),
             origin_txn="0x7b6785e74dad9ac03b7fcb6d4b20fe2f2178d7eb90a563bcfa1c613d2785f31b",
             origin_block_hash="0xa37a7b5b95a98db4ea0b27972f2c2c02bda99c2e035d7478b67f9c456b43a5c3",
             origin_batch=1,
