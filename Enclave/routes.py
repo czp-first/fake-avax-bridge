@@ -6,6 +6,7 @@
 """
 
 from enum import Enum
+import sqlite3
 
 from loguru import logger
 
@@ -65,112 +66,143 @@ def store_credential(share_version: int, threshold: int, wardens: list, from_cha
 #     return wallet.recover_wallet(shares)
 
 
-def process_onboard_txn(txn, identification, db_conn):
-    cursor = db_conn.cursor()
-    cursor.execute(
+class ProcessTxn:
+    def __init__(self, is_onboard: bool, txn: dict, identification: str, db_conn: sqlite3.Connection) -> None:
+        """_summary_
+
+        :param bool is_onboard: 是否是上桥交易
+        :param dict txn: 交易信息
+        :param str identification: warden标识
+        :param sqlite3.Connection db_conn: 数据库链接
         """
-            SELECT status, wardens
-            FROM enclave_onboard_txn
-            WHERE block_hash=? AND transaction_hash=? AND batch=?
-        """,
-        (txn["block_hash"], txn["txn_hash"], txn["batch"])
-    )
-    row = cursor.fetchone()
-    if not row:
-        logger.info("onboard: new onboard transaction")
-        cursor.execute(
-            """
-                INSERT INTO enclave_onboard_txn(block_hash, transaction_hash, batch, wardens, status)
-                    VALUES(?, ?, ?, ?, ?)
-            """,
-            (txn["block_hash"], txn["txn_hash"], txn["batch"], identification, EnclaveTxnStatus.Wait.value)
-        )
-        db_conn.commit()
-        return dict(status=EnclaveTxnStatus.Wait.value)
-    else:
-        wardens = row[1].split(",")
-        if identification in wardens:
-            logger.info("onboard: duplicate")
-            return dict(status=row[0])
-
-        if row[0] != EnclaveTxnStatus.Wait.value:
-            logger.info("onboard: status {}", row[0])
-            return dict(status=row[0])
-
-        cursor.execute("SELECT value FROM config WHERE key=?", ("threshold",))
-        threshold = int(cursor.fetchone()[0])
-        logger.info("onboard: current wardens {}", wardens)
-        wardens.append(identification)
-        if len(wardens) >= threshold:
-            logger.info("onboard: ready")
-            cursor.execute(
-                """
-                    UPDATE enclave_onboard_txn
-                    SET wardens=?, status=?
-                    WHERE block_hash=? AND transaction_hash=? AND batch=?
-                """,
-                (",".join(wardens), EnclaveTxnStatus.Pending.value, txn["block_hash"], txn["txn_hash"], txn["batch"])
-            )
-            cursor.execute(
-                """
-                    SELECT identification, url
-                    FROM warden
-                    WHERE identification IN ({seq})
-                    ORDER BY id
-                """.format(seq=",".join(["?"]*threshold)),
-                wardens[:threshold],
-            )
-            wardens_info = [
-                dict(
-                    identification=i[0],
-                    url=i[1],
-                )
-                for i in cursor.fetchall()
-            ]
-            cursor.close()
-            db_conn.commit()
-            return dict(
-                status=EnclaveTxnStatus.Ready.value,
-                wardens=wardens_info,
-            )
+        if is_onboard:
+            self.txn_table = "enclave_onboard_txn"
         else:
-            logger.info("onboard: go on waiting")
-            cursor.execute(
-                """
-                    UPDATE enclave_onboard_txn
-                    SET wardens=?
-                    WHERE block_hash=? AND transaction_hash=? AND batch=?
-                """,
-                (",".join(wardens), txn["block_hash"], txn["txn_hash"], txn["batch"])
+            self.txn_table = "enclave_offboard_txn"
+
+        self._txn = txn
+        self.block_hash = txn["block_hash"]
+        self.txn_hash = txn["txn_hash"]
+        self.batch = txn["batch"]
+        self.identification = identification
+        self.db_conn = db_conn
+        self.cursor: sqlite3.Cursor = self.db_conn.cursor()
+
+    def get_sql(self, base_sql):
+        """添加sql的表名"""
+        return base_sql.format(table=self.txn_table)
+
+    def get_enclave_txn(self):
+        """获取enclave中对应的交易信息"""
+        sql = self.get_sql("""
+                SELECT status, wardens
+                FROM {table}
+                WHERE block_hash=? AND transaction_hash=? AND batch=?
+            """
+        )
+        self.cursor.execute(sql, (self.block_hash, self.txn_hash, self.batch))
+        row = self.cursor.fetchone()
+        if not row:
+            return None
+        return dict(status=row[0], wardens=row[1].split(","))
+
+    def insert_new_enclave_txn(self):
+        """在enclave中插入新的交易"""
+        logger.info("{}: new {} transaction", self.txn_table, self.txn_table)
+        sql = self.get_sql(
+            """
+                INSERT INTO {table}(block_hash, transaction_hash, batch, wardens, status)
+                    VALUES(?, ?, ?, ?, ?)
+            """
+        )
+        self.cursor.execute(sql, (self.block_hash, self.txn_hash, self.batch, self.identification, EnclaveTxnStatus.Wait.value))
+        return dict(status=EnclaveTxnStatus.Wait.value)
+
+    def process_ready(self, threshold, latest_wardens):
+        """处理达到共识的交易"""
+        logger.info("{}: ready", self.txn_table)
+        sql = self.get_sql(
+            """
+                UPDATE {table}
+                SET wardens=?, status=?
+                WHERE block_hash=? AND transaction_hash=? AND batch=?
+            """
+        )
+        self.cursor.execute(sql, (",".join(latest_wardens), EnclaveTxnStatus.Pending.value, self.block_hash, self.txn_hash, self.batch))
+        self.cursor.execute(
+            """
+                SELECT identification, url
+                FROM warden
+                WHERE identification IN ({seq})
+                ORDER BY id
+            """.format(seq=",".join(["?"]*threshold)),
+            latest_wardens[:threshold],
+        )
+        wardens_info = [
+            dict(
+                identification=i[0],
+                url=i[1],
             )
-            cursor.close()
-            db_conn.commit()
-            return dict(status=EnclaveTxnStatus.Wait.value)
+            for i in self.cursor.fetchall()
+        ]
+        return dict(
+            status=EnclaveTxnStatus.Ready.value,
+            wardens=wardens_info
+        )
+
+    def process_unready(self, latest_wardens):
+        """处理未达到共识的交易"""
+        logger.info("{}: go on waiting", self.txn_table)
+        sql = self.get_sql(
+            """
+                UPDATE {table}
+                SET wardens=?
+                WHERE block_hash=? AND transaction_hash=? AND batch=?
+            """
+        )
+        self.cursor.execute(sql, (",".join(latest_wardens), self.block_hash, self.txn_hash, self.batch))
+        return dict(status=EnclaveTxnStatus.Wait.value)
+
+    def process_new_warden(self, wardens):
+        """处理交易加入新的warden"""
+        self.cursor.execute("SELECT value FROM config WHERE key=?", ("threshold",))
+        threshold = int(self.cursor.fetchone()[0])
+        logger.info("{}: current wardens {}", self.txn_table, wardens)
+        wardens.append(self.identification)
+        if len(wardens) >= threshold:
+            return self.process_ready(threshold, wardens)
+        return self.process_unready(wardens)
+
+    def process_old_enclave_txn(self, enclave_txn: dict):
+        """处理在enclave已经存在的交易"""
+        if self.identification in enclave_txn["wardens"] or enclave_txn["status"] != EnclaveTxnStatus.Wait.value:
+            logger.info("{}: status {}", self.txn_table, enclave_txn["status"])
+            return dict(status=enclave_txn["status"])
+
+        return self.process_new_warden(enclave_txn["wardens"])
+
+    def process_enclave_txn(self, enclave_txn):
+        """处理对应的enclave中的交易"""
+        if enclave_txn:
+            return self.process_old_enclave_txn(enclave_txn)
+        return self.insert_new_enclave_txn()
+
+    def run(self):
+        encalve_txn = self.get_enclave_txn()
+        result = self.process_enclave_txn(encalve_txn)
+        self.cursor.close()
+        self.db_conn.commit()
+        return result
 
 
-# TODO(Rey): refactor like proceess_onboard_txn
-def process_offboard_txn(txn, identification):
+def process_onboard_txn(txn, identification, db_conn: sqlite3.Connection):
+    """处理上桥交易"""
+    return ProcessTxn(True, txn, identification, db_conn).run()
 
-    unique_txn = f'{txn["block_hash"]}{txn["txn_hash"]}{txn["batch"]}'
-    if unique_txn in pending_offboard_txns:
-        return {'status': 'pending'}
-    if unique_txn in ago_offboard_txns:
-        return {'status': 'ago'}
 
-    if unique_txn in comfirming_offboard_txns:
-        if identification in comfirming_offboard_txns[unique_txn]:
-            return {'status': 'wait'}
-        comfirming_offboard_txns[unique_txn].append(identification)
-        if len(comfirming_offboard_txns[unique_txn]) >= threshold:
-            pending_offboard_txns.append(unique_txn)
-            return {
-                'status': 'ready',
-                'wardens': comfirming_offboard_txns[unique_txn][:threshold]
-            }
-        return {'status': 'wait'}
-
-    comfirming_offboard_txns[unique_txn] = [identification]
-    return {'status': 'wait'}
+def process_offboard_txn(txn, identification, db_conn: sqlite3.Connection):
+    """处理下桥交易"""
+    return ProcessTxn(False, txn, identification, db_conn).run()
 
 
 def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, fee, origin_txn, origin_block_hash, origin_batch, db_conn):
