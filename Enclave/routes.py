@@ -230,7 +230,7 @@ def set_enclave_txn_ago(is_onboard, db_conn, block_hash, txn_hash, batch):
     return urls
 
 
-def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, fee, origin_txn, origin_block_hash, origin_batch, db_conn):
+def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, fee, origin_txn_hash, origin_block_hash, origin_batch, db_conn):
     """签名上桥交易对应的跨链交易"""
     mnemonic = get_mnemonic(warden_shares, db_conn)
 
@@ -243,11 +243,11 @@ def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount,
         gas_price=gas_price,
         account_addr=account_addr,
         nonce=nonce,
-        origin_txn=origin_txn,
+        origin_txn_hash=origin_txn_hash,
         fee=fee,
     )
 
-    urls = set_enclave_txn_ago(True, db_conn, origin_block_hash, origin_txn, origin_batch)
+    urls = set_enclave_txn_ago(True, db_conn, origin_block_hash, origin_txn_hash, origin_batch)
     db_conn.commit()
 
     return {
@@ -260,7 +260,7 @@ def sign_onboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount,
     }
 
 
-def sign_offboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, origin_block_hash, origin_txn, origin_batch, db_conn):
+def sign_offboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount, gas_price, account_addr, nonce, origin_block_hash, origin_txn_hash, origin_batch, db_conn):
     """签名下桥交易对应的跨链交易"""
     mnemonic = get_mnemonic(warden_shares, db_conn)
 
@@ -275,7 +275,7 @@ def sign_offboard_txn(is_eip1559, warden_shares, chain_id, contract_addr, amount
         nonce=nonce
     )
 
-    urls = set_enclave_txn_ago(False, db_conn, origin_block_hash, origin_txn, origin_batch)
+    urls = set_enclave_txn_ago(False, db_conn, origin_block_hash, origin_txn_hash, origin_batch)
     db_conn.commit()
 
     return {

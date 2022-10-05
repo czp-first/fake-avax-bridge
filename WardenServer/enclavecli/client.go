@@ -32,7 +32,9 @@ type EnclaveClient struct {
 }
 
 func NewEnclaveAPI(enclaveUrl string) (*EnclaveClient, error) {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()}
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock()}
 	conn, err := grpc.Dial(enclaveUrl, opts...)
 	if err != nil {
 		return nil, err

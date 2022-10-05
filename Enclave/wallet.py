@@ -1,4 +1,12 @@
+# -*- coding: UTF-8 -*-
+"""
+@Summary : docstr
+@Author  : Rey
+@Time    : 2022-10-05 15:05:11
+"""
+
 from decimal import Decimal
+from typing import Tuple
 
 from web3 import Web3
 from web3.auto import w3
@@ -12,12 +20,31 @@ from settings import enclave_settings
 import shamir
 
 
-def get_wallet(mnemonic: str):
-    passphrase = None
-    bip44_hdwallet = BIP44HDWallet(cryptocurrency=EthereumMainnet)
-    bip44_hdwallet.from_mnemonic(mnemonic=mnemonic, language='english', passphrase=passphrase)
-    bip44_hdwallet.clean_derivation()
-    return bip44_hdwallet
+class Wallet:
+    def __init__(self, mnemonic: str) -> None:
+        if not mnemonic:
+            self.mnemonic = generate_mnemonic()
+        else:
+            self.mnemonic = mnemonic
+        self._wallet = None
+
+    @property
+    def wallet(self) -> BIP44HDWallet:
+        if not self._wallet:
+            passphrase = None
+            bip44_hdwallet = BIP44HDWallet(cryptocurrency=EthereumMainnet)
+            bip44_hdwallet.from_mnemonic(mnemonic=self.mnemonic, language='english', passphrase=passphrase)
+            bip44_hdwallet.clean_derivation()
+            self._wallet = bip44_hdwallet
+        return self._wallet
+
+    def get_account(self, account, address=0) -> Tuple[str, str]:
+        bip44_derivation = BIP44Derivation(cryptocurrency=EthereumMainnet, account=account, change=False, address=address)
+        self.wallet.from_path(path=bip44_derivation)
+        address = self.wallet.address()
+        private_key = f'0x{self.wallet.private_key()}'
+        self.wallet.clean_derivation()
+        return address, private_key
 
 
 def init_wallet(parts: int, threshold: int, onboard_chain_id: int, offboard_chain_id: int):
@@ -25,42 +52,23 @@ def init_wallet(parts: int, threshold: int, onboard_chain_id: int, offboard_chai
     :param parts: the number of shares
     :param threshold: the number of shares to recover
     """
-    mnemonic = generate_mnemonic()
-
-    bip44_hdwallet = get_wallet(mnemonic)
-
-    onboard_bip44_derivation = BIP44Derivation(cryptocurrency=EthereumMainnet, account=onboard_chain_id, change=False, address=0)
-    bip44_hdwallet.from_path(path=onboard_bip44_derivation)
-    onboard_account_address = bip44_hdwallet.address()
-    bip44_hdwallet.clean_derivation()
-
-    offboard_bip44_derivation = BIP44Derivation(cryptocurrency=EthereumMainnet, account=offboard_chain_id, change=False, address=0)
-    bip44_hdwallet.from_path(path=offboard_bip44_derivation)
-    offboard_account_address = bip44_hdwallet.address()
-    bip44_hdwallet.clean_derivation()
+    mnemonic = ""
+    wallet = Wallet(mnemonic=mnemonic)
+    onboard_account_address, _ = wallet.get_account(account=onboard_chain_id)
+    offboard_account_address, _ = wallet.get_account(account=offboard_chain_id)
 
     return dict(
-        shares=shamir.split(parts, threshold, mnemonic),
+        shares=shamir.split(parts, threshold, wallet.mnemonic),
         onboard_account_address=onboard_account_address,
         offboard_account_address=offboard_account_address,
     )
 
 
 def sign_onboard_transaction(
-    is_eip1559, mnemonic, chain_id, contract_addr, amount, gas_price, account_addr, nonce, origin_txn, fee
+    is_eip1559, mnemonic, chain_id, contract_addr, amount, gas_price, account_addr, nonce, origin_txn_hash, fee
 ):
-    """
-    :param amount: unit(wei)
-    :param gas_price: unit(wei)
-    """
 
-    bip44_hdwallet = get_wallet(mnemonic)
-
-    bip44_derivation = BIP44Derivation(cryptocurrency=EthereumMainnet, account=chain_id, change=False, address=0)
-    bip44_hdwallet.from_path(path=bip44_derivation)
-    # sender_addr = bip44_hdwallet.address()
-    private_key = f'0x{bip44_hdwallet.private_key()}'
-    bip44_hdwallet.clean_derivation()
+    _, private_key = Wallet(mnemonic=mnemonic).get_account(account=chain_id)
 
     dx_contract = w3.eth.contract(
         address=Web3.toChecksumAddress(contract_addr),
@@ -85,7 +93,7 @@ def sign_onboard_transaction(
         Web3.toWei(Decimal(amount), 'wei'),
         enclave_settings.fee_address,
         Web3.toWei(Decimal(fee), 'wei'),
-        origin_txn
+        origin_txn_hash
     ).buildTransaction(transaction_params)
 
     sign_transaction = w3.eth.account.sign_transaction(
@@ -98,18 +106,7 @@ def sign_onboard_transaction(
 
 def sign_offboard_transaction(is_eip1559, mnemonic, chain_id, contract_addr, amount, gas_price, account_addr, nonce):
 
-    passphrase = None
-    bip44_hdwallet = BIP44HDWallet(cryptocurrency=EthereumMainnet)
-    bip44_hdwallet.from_mnemonic(mnemonic=mnemonic, language='english', passphrase=passphrase)
-    bip44_hdwallet.clean_derivation()
-
-    bip44_derivation = BIP44Derivation(
-        cryptocurrency=EthereumMainnet, account=chain_id, change=False, address=0
-    )
-    bip44_hdwallet.from_path(path=bip44_derivation)
-    # sender_addr = bip44_hdwallet.address()
-    private_key = f'0x{bip44_hdwallet.private_key()}'
-    bip44_hdwallet.clean_derivation()
+    _, private_key = Wallet(mnemonic=mnemonic).get_account(account=chain_id)
 
     contract = w3.eth.contract(
         address=Web3.toChecksumAddress(contract_addr),
@@ -142,10 +139,8 @@ def sign_offboard_transaction(is_eip1559, mnemonic, chain_id, contract_addr, amo
 
 def recover_wallet(shares):
     mnemonic = shamir.combine(','.join(shares))
-    print(mnemonic)
     passphrase = None
     bip44_hdwallet = BIP44HDWallet(cryptocurrency=EthereumMainnet)
     bip44_hdwallet.from_mnemonic(mnemonic=mnemonic, language='english', passphrase=passphrase)
     bip44_hdwallet.clean_derivation()
     return mnemonic
-

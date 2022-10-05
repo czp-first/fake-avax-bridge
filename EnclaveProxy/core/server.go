@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"os"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -18,10 +17,10 @@ import (
 	"github.com/czp-first/fake-avax-bridge/EnclaveProxy/wardencli"
 )
 
-type EnclaveTxn struct {
-	BlockHash string `json:"block_hash"`
-	TxnHash   string `json:"txn_hash"`
-	Batch     int64  `json:"batch"`
+// ---------------process onboard txn---------------
+type EnclaveOnboardTxnReq struct {
+	Method string                `json:"method"`
+	Body   EnclaveOnboardTxnBody `json:"body"`
 }
 
 type EnclaveOnboardTxnBody struct {
@@ -29,9 +28,14 @@ type EnclaveOnboardTxnBody struct {
 	Identification string     `json:"identification"`
 }
 
-type EnclaveOnboardTxnReq struct {
-	Method string                `json:"method"`
-	Body   EnclaveOnboardTxnBody `json:"body"`
+type EnclaveTxn struct {
+	BlockHash string `json:"block_hash"`
+	TxnHash   string `json:"txn_hash"`
+	Batch     int64  `json:"batch"`
+}
+
+type EnclaveOnboardTxnResp struct {
+	Content EnclaveOnboardTxnContent `json:"content"`
 }
 
 type EnclaveOnboardTxnContent struct {
@@ -44,10 +48,9 @@ type WardenInfo struct {
 	Url            string `json:"url"`
 }
 
-type EnclaveOnboardTxnResp struct {
-	Content EnclaveOnboardTxnContent `json:"content"`
-}
+// ---------------process onboard txn---------------
 
+// ---------------sign onboard txn---------------
 type EnclaveSignOnboardTxnReq struct {
 	Method string                    `json:"method"`
 	Body   EnclaveSignOnboardTxnBody `json:"body"`
@@ -62,7 +65,7 @@ type EnclaveSignOnboardTxnBody struct {
 	GasPrice        uint64         `json:"gas_price"`
 	AccountAddr     string         `json:"account_addr"`
 	Nonce           uint64         `json:"nonce"`
-	OriginTxn       string         `json:"origin_txn"`
+	OriginTxnHash   string         `json:"origin_txn_hash"`
 	OriginBlockHash string         `json:"origin_block_hash"`
 	OriginBatch     int64          `json:"origin_batch"`
 	Fee             uint64         `json:"fee"`
@@ -85,6 +88,9 @@ type EnclaveSignTxnContent struct {
 	Urls      []string `json:"urls"`
 }
 
+// ---------------sign onboard txn---------------
+
+// ---------------process offboard txn---------------
 type EnclaveOffboardTxnReq struct {
 	Method string                 `json:"method"`
 	Body   EnclaveOffboardTxnBody `json:"body"`
@@ -100,24 +106,30 @@ type EnclaveOffboardTxnResp struct {
 }
 
 type EnclaveOffboardTxnContent struct {
-	Status  string   `json:"status"`
-	Wardens []string `json:"wardens"`
+	Status  string        `json:"status"`
+	Wardens []*WardenInfo `json:"wardens"`
 }
 
+// ---------------process offboard txn---------------
+
+// ---------------sign offboard txn---------------
 type EnclaveSignOffboardTxnReq struct {
 	Method string                     `json:"method"`
 	Body   EnclaveSignOffboardTxnBody `json:"body"`
 }
 
 type EnclaveSignOffboardTxnBody struct {
-	IsEip1559    bool           `json:"is_eip1559"`
-	WardenShares []*WardenShare `json:"warden_shares"`
-	ChainId      uint64         `json:"chain_id"`
-	ContractAddr string         `json:"contract_addr"`
-	RealAmount   uint64         `json:"amount"`
-	GasPrice     uint64         `json:"gas_price"`
-	AccountAddr  string         `json:"account_addr"`
-	Nonce        uint64         `json:"nonce"`
+	IsEip1559       bool           `json:"is_eip1559"`
+	WardenShares    []*WardenShare `json:"warden_shares"`
+	ChainId         uint64         `json:"chain_id"`
+	ContractAddr    string         `json:"contract_addr"`
+	RealAmount      uint64         `json:"amount"`
+	GasPrice        uint64         `json:"gas_price"`
+	AccountAddr     string         `json:"account_addr"`
+	Nonce           uint64         `json:"nonce"`
+	OriginTxnHash   string         `json:"origin_txn_hash"`
+	OriginBlockHash string         `json:"origin_block_hash"`
+	OriginBatch     int64          `json:"origin_batch"`
 }
 
 type EnclaveSignOffboardTxnResp struct {
@@ -125,11 +137,14 @@ type EnclaveSignOffboardTxnResp struct {
 }
 
 type EnclaveSignOffboardTxnContent struct {
-	Txn       string `json:"txn"`
-	Nonce     uint64 `json:"nonce"`
-	GasPrice  uint64 `json:"gas_price"`
-	IsEip1559 bool   `json:"is_eip1559"`
+	Txn       string   `json:"txn"`
+	Nonce     uint64   `json:"nonce"`
+	GasPrice  uint64   `json:"gas_price"`
+	IsEip1559 bool     `json:"is_eip1559"`
+	Urls      []string `json:"urls"`
 }
+
+// ---------------sign offboard txn---------------
 
 func (s *EnclaveProxyContext) ReceiveOnboardTxn(ctx context.Context, in *pb.OnboardTxn) (*pb.Status, error) {
 
@@ -259,7 +274,7 @@ func readyOnboard(wardens []*WardenInfo, blockHash, txnHash string, batch int64)
 			GasPrice:        gasPrice,
 			AccountAddr:     account,
 			Nonce:           nonce,
-			OriginTxn:       txnHash,
+			OriginTxnHash:   txnHash,
 			OriginBlockHash: blockHash,
 			OriginBatch:     batch,
 			Fee:             fee,
@@ -304,17 +319,8 @@ func readyOnboard(wardens []*WardenInfo, blockHash, txnHash string, batch int64)
 	return nil
 }
 
-func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) error {
-	wardenConfFile, _ := os.OpenFile(os.Getenv("WardensConfPath"), os.O_RDONLY, 0644)
-	defer wardenConfFile.Close()
-	wardenMap := make(map[string]string)
-	decoder := json.NewDecoder(wardenConfFile)
-
-	err := decoder.Decode(&wardenMap)
-	if err != nil {
-		return err
-	}
-
+func readyOffboard(wardens []*WardenInfo, blockHash, txnHash string, batch int64) error {
+	log.Infof("ready offboard txn: %s", txnHash)
 	in := wardenpb.GetWardenOffboardReq{
 		BlockHash: blockHash,
 		TxnHash:   txnHash,
@@ -324,9 +330,9 @@ func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) err
 	var account, contract string
 	wardenShares := make([]*WardenShare, 0)
 
-	for index, identification := range wardens {
+	for index, warden := range wardens {
 
-		offboardTxnResp := wardencli.GetOffboardTxn(wardenMap[identification], &in)
+		offboardTxnResp := wardencli.GetOffboardTxn(warden.Url, &in)
 
 		// TODO: nonce 处理
 		if index == 0 {
@@ -362,7 +368,7 @@ func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) err
 		}
 
 		wardenShares = append(wardenShares, &WardenShare{
-			Identification: identification,
+			Identification: warden.Identification,
 			EncryptShare:   offboardTxnResp.Share,
 		})
 	}
@@ -370,13 +376,16 @@ func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) err
 	req := EnclaveSignOffboardTxnReq{
 		Method: "signOffboardTxn",
 		Body: EnclaveSignOffboardTxnBody{
-			WardenShares: wardenShares,
-			ChainId:      chainId,
-			ContractAddr: contract,
-			RealAmount:   realAmount,
-			GasPrice:     gasPrice,
-			AccountAddr:  account,
-			Nonce:        nonce,
+			WardenShares:    wardenShares,
+			ChainId:         chainId,
+			ContractAddr:    contract,
+			RealAmount:      realAmount,
+			GasPrice:        gasPrice,
+			AccountAddr:     account,
+			Nonce:           nonce,
+			OriginTxnHash:   txnHash,
+			OriginBlockHash: blockHash,
+			OriginBatch:     batch,
 		},
 	}
 
@@ -390,7 +399,7 @@ func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) err
 	txn := new(types.Transaction)
 	rlp.DecodeBytes(rawTxnBytes, &txn)
 
-	client, err := ethclient.Dial(os.Getenv("ETHHttps"))
+	client, err := ethclient.Dial(os.Getenv("FromChainHttps"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -400,8 +409,8 @@ func readyOffboard(wardens []string, blockHash, txnHash string, batch int64) err
 	}
 	log.Infof("offboard txn hash: %v", txn.Hash().String())
 
-	for _, addr := range wardenMap {
-		wardencli.Offboard(addr, &wardenpb.OffboardReq{
+	for _, url := range resp.Content.Urls {
+		wardencli.Offboard(url, &wardenpb.OffboardReq{
 			BlockHash:       blockHash,
 			TxnHash:         txnHash,
 			OffboardTxnHash: txn.Hash().String(),

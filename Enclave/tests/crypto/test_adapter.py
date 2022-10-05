@@ -10,6 +10,8 @@ import json
 import sqlite3
 import unittest
 
+from cryptography.fernet import Fernet
+
 from crypto.adapter import get_crypto_obj
 
 
@@ -21,8 +23,8 @@ class TestGetCryptoObj(unittest.TestCase):
         with open("db/schema.sql") as f:
             cursor.executescript(f.read())
         self.identification = "warden1"
-        self.credential = json.dumps(dict(key="vHjfA2zvVSAY1FPUZRqnoWyJC4zeRJKU_3aBCUqrm8g="))
-        cursor.execute("INSERT INTO warden(identification, credential)VALUES(?, ?)", (self.identification, self.credential))
+        self.credential = json.dumps(dict(key=Fernet.generate_key().decode("utf-8")))
+        cursor.execute("INSERT INTO warden(identification, credential, url)VALUES(?, ?, ?)", (self.identification, self.credential, "url1"))
         cursor.close()
 
     def test_local(self):

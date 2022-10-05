@@ -6,12 +6,34 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	pb "github.com/czp-first/fake-avax-bridge/WardenServer/wardenpb"
 )
 
+type WardenClient struct {
+	wardenConn *grpc.ClientConn
+}
+
+func NewWardenAPI(wardenUrl string) (*WardenClient, error) {
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock()}
+	conn, err := grpc.Dial(wardenUrl, opts...)
+	if err != nil {
+		return nil, err
+	}
+	warden := &WardenClient{
+		wardenConn: conn,
+	}
+	return warden, nil
+}
+
 func GetOnboardTxn(address string, in *pb.GetWardenOnboardReq) *pb.GetWardenOnboardResp {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock()}
+	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		log.Fatalf("did not connect :%v", err)
 	}
@@ -31,7 +53,10 @@ func GetOnboardTxn(address string, in *pb.GetWardenOnboardReq) *pb.GetWardenOnbo
 }
 
 func Onboard(address string, in *pb.OnboardReq) *pb.Empty {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock()}
+	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		log.Fatalf("did not connect :%v", err)
 	}
@@ -51,7 +76,10 @@ func Onboard(address string, in *pb.OnboardReq) *pb.Empty {
 }
 
 func GetOffboardTxn(address string, in *pb.GetWardenOffboardReq) *pb.GetWardenOffboardResp {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock()}
+	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		log.Fatalf("did not connect :%v", err)
 	}
@@ -71,7 +99,10 @@ func GetOffboardTxn(address string, in *pb.GetWardenOffboardReq) *pb.GetWardenOf
 }
 
 func Offboard(address string, in *pb.OffboardReq) *pb.Empty {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock()}
+	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		log.Fatalf("did not connect :%v", err)
 	}

@@ -90,7 +90,7 @@ class TestSignOffboardTxn(unittest.TestCase):
             gas_price=gas_price,
             account_addr="0x44fe5BD0e041aB1E42579812dA1D36234577Cf74",
             nonce=nonce,
-            origin_txn="0x7b6785e74dad9ac03b7fcb6d4b20fe2f2178d7eb90a563bcfa1c613d2785f31b",
+            origin_txn_hash="0x7b6785e74dad9ac03b7fcb6d4b20fe2f2178d7eb90a563bcfa1c613d2785f31b",
             origin_block_hash="0xa37a7b5b95a98db4ea0b27972f2c2c02bda99c2e035d7478b67f9c456b43a5c3",
             origin_batch=1,
             db_conn=self.conn,
