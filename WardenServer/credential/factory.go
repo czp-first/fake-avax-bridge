@@ -15,17 +15,13 @@ type CredentialInterface interface {
 	Decrypt(ciphertext string) string
 }
 
-func GetCredential() (CredentialFactory, error) {
-
+func GetCredentialFactory() (CredentialFactory, error) {
 	credentialType := os.Getenv("CredentialType")
 	if credentialType == "local" {
 		return &LocalCredentialFactory{}, nil
 	}
 
-	// TODO
-	// if credentialType == "aws" {
-	// 	return
-	// }
+	// TODO: kms
 
 	return nil, fmt.Errorf("unknown credential type: %s", credentialType)
 }

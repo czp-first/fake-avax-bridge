@@ -155,7 +155,7 @@ func (ctx *WardenContext) initEnclaveClient() error {
 }
 
 func (ctx *WardenContext) initCredential() error {
-	credentialFactory, err := credential.GetCredential()
+	credentialFactory, err := credential.GetCredentialFactory()
 	if err != nil {
 		return err
 	}
